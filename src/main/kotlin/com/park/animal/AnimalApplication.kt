@@ -7,5 +7,5 @@ import org.springframework.boot.runApplication
 class AnimalApplication
 
 fun main(args: Array<String>) {
-    runApplication<AnimalApplication>(*args)
+	runApplication<AnimalApplication>(*args)
 }
