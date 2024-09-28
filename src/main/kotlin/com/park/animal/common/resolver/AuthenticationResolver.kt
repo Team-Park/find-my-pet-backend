@@ -1,6 +1,6 @@
 package com.park.animal.common.resolver
 
-import com.park.animal.auth.Role
+import com.park.animal.auth.entity.Role
 import com.park.animal.common.annotation.AuthenticationUser
 import com.park.animal.common.constants.AuthConstants
 import com.park.animal.common.http.error.ErrorCode

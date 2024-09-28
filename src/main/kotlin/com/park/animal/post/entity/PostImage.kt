@@ -1,4 +1,4 @@
-package com.park.animal.post
+package com.park.animal.post.entity
 
 import com.park.animal.common.persistence.BaseEntity
 import jakarta.persistence.Column

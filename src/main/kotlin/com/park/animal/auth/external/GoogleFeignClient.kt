@@ -8,7 +8,8 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestParam
 
-@FeignClient(name = "googleFeignClient", url = "https://oauth2.googleapis.com")
+// https://oauth2.googleapis.com
+@FeignClient(name = "googleFeignClient", url = "https://www.googleapis.com")
 interface GoogleFeignClient {
     @PostMapping("/token")
     fun getToken(
@@ -16,7 +17,7 @@ interface GoogleFeignClient {
         request: GoogleTokenRequestDto,
     ): GoogleTokenResponseDto
 
-    @GetMapping("/userinfo/v2/me")
+    @GetMapping("oauth2/v3/userinfo")
     fun getUserInfo(@RequestParam("access_token") accessToken: String): GoogleUserInfoDto
 }
 

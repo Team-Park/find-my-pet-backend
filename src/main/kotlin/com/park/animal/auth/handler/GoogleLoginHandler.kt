@@ -2,10 +2,12 @@ package com.park.animal.auth.handler
 
 import com.park.animal.auth.SocialLoginProvider
 import com.park.animal.auth.SocialLoginProvider.GOOGLE
+import com.park.animal.auth.dto.UserInfoDto
 import com.park.animal.auth.external.GoogleFeignClient
 import com.park.animal.auth.external.GoogleTokenRequestDto
 import com.park.animal.auth.service.JwtTokenService
 import com.park.animal.auth.service.UserService
+import com.park.animal.common.constants.AuthConstants
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 
@@ -37,5 +39,9 @@ class GoogleLoginHandler(
 
     override fun isApplicable(provider: SocialLoginProvider): Boolean = provider == GOOGLE
 
-    override fun getUserInfoId(accessToken: String): String = googleFeignClient.getUserInfo(accessToken).id
+    override fun getUserInfoId(accessToken: String): UserInfoDto {
+        return googleFeignClient.getUserInfo(accessToken = AuthConstants.BEARER_PREFIX + accessToken).let {
+            UserInfoDto(socialId = it.id, name = it.name)
+        }
+    }
 }

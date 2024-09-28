@@ -2,10 +2,14 @@ package com.park.animal.post
 
 import com.park.animal.common.annotation.AuthenticationUser
 import com.park.animal.common.annotation.PublicEndPoint
+import com.park.animal.common.http.response.PaginatedApiResponseDto
 import com.park.animal.common.http.response.SucceededApiResponseBody
 import com.park.animal.common.resolver.UserContext
+import com.park.animal.post.dto.PostDetailResponse
+import com.park.animal.post.dto.PostSummaryResponse
 import com.park.animal.post.dto.RegisterPostCommand
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
@@ -20,11 +24,15 @@ class PostController(
     private val postService: PostService,
 ) {
     @GetMapping("/posts")
-    fun getPosts() {
+    fun getPosts(
+
+    ): PaginatedApiResponseDto<PostSummaryResponse> {
+        throw RuntimeException()
     }
 
-    fun getPost() {
-
+    @GetMapping("/post/{id}")
+    fun getPost(@PathVariable id: UUID): SucceededApiResponseBody<PostDetailResponse> {
+        TODO()
     }
 
     @PostMapping(path = ["/post"], consumes = ["multipart/form-data", "application/json"])

@@ -1,5 +1,6 @@
-package com.park.animal.auth
+package com.park.animal.auth.entity
 
+import com.park.animal.auth.SocialLoginProvider
 import com.park.animal.common.constants.AuthConstants
 import com.park.animal.common.persistence.BaseEntity
 import jakarta.persistence.AttributeOverride
