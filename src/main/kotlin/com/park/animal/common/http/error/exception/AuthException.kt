@@ -1,6 +1,6 @@
-package com.park.animal.common.error.exception
+package com.park.animal.common.http.error.exception
 
-import com.park.animal.common.error.ErrorCode
+import com.park.animal.common.http.error.ErrorCode
 
 open class AuthException(open val errorCode: ErrorCode) : RuntimeException()
 

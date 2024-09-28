@@ -1,8 +1,10 @@
 package com.park.animal.auth.controller
 
+import com.park.animal.auth.dto.JwtResponseDto
 import com.park.animal.auth.dto.SignInWithSocialRequest
 import com.park.animal.auth.service.SignInService
 import com.park.animal.common.annotation.PublicEndPoint
+import com.park.animal.common.http.response.SucceededApiResponseBody
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -15,13 +17,15 @@ class SignInController(
 ) {
     @PostMapping("/sign-in/kakao")
     @PublicEndPoint
-    fun kakaoLogin(@RequestBody request: SignInWithSocialRequest) {
-        signInService.signInWithSocial(request.toKaKaoCommand())
+    fun kakaoLogin(@RequestBody request: SignInWithSocialRequest): SucceededApiResponseBody<JwtResponseDto> {
+        val response = signInService.signInWithSocial(request.toKaKaoCommand())
+        return SucceededApiResponseBody(data = response)
     }
 
     @PostMapping("/sign-in/google")
     @PublicEndPoint
-    fun signInWithGoogle(@RequestBody request: SignInWithSocialRequest) {
-        signInService.signInWithSocial(request.toGoogleCommand())
+    fun signInWithGoogle(@RequestBody request: SignInWithSocialRequest): SucceededApiResponseBody<JwtResponseDto> {
+        val response = signInService.signInWithSocial(request.toGoogleCommand())
+        return SucceededApiResponseBody(data = response)
     }
 }

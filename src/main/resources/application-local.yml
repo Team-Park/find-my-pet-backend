@@ -1,0 +1,25 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+
+aws:
+  s3:
+    bucket-name: ${AWS_S3_BUCKET_NAME:bucketName}
+    access-key: ${AWS_S3_ACCESS_KEY:accessKey}
+    secret-key: ${AWS_S3_SECRET_KEY:secretKey}
+
+cloud-front:
+  domain: ${CLOUD_FRONT_DOMAIN_NAME:https://d3vt348duxk7vk.cloudfront.net}
+
+jwt:
+  access-token:
+    secret-key: ${ACCESS_SECRET_KEY:qwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwq}
+    expire-millis: ${ACCESS_EXPIRE_MILLIS:100000000000}
+  refresh-token:
+    secret-key: ${REFRESH_SECRET_KEY:asasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasaasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasaasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasa}
+    expire-millis: ${REFRESH_EXPIRE_MILLIS:1000000000000000}

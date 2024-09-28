@@ -7,15 +7,20 @@ spring:
     username: ${RDBMS_USERNAME:root}
     password: ${RDBMS_PASSWORD:1234}
 
-
+  servlet:
+    multipart:
+      enabled: true
+      file-size-threshold: 0B
+      max-file-size: 100MB
+      max-request-size: 100MB
 
 jwt:
   access-token:
-    secret-key: ${ACCESS_SECRET_KEY:qwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwq}
-    expire-millis: ${ACCESS_EXPIRE_MILLIS:1000000}
+    secret-key: ${ACCESS_SECRET_KEY}
+    expire-millis: ${ACCESS_EXPIRE_MILLIS}
   refresh-token:
-    secret-key: ${REFRESH_SECRET_KEY:asasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasaasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasaasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasa}
-    expire-millis: ${REFRESH_EXPIRE_MILLIS:100000000}
+    secret-key: ${REFRESH_SECRET_KEY}
+    expire-millis: ${REFRESH_EXPIRE_MILLIS}
 
 auth:
   grant-type: authorization_code
@@ -24,3 +29,12 @@ auth:
   google:
     client-id:
     client-secret:
+
+aws:
+  s3:
+    secret-key:
+    access-ke:
+    bucket-name:
+
+cloud-front:
+  domain:

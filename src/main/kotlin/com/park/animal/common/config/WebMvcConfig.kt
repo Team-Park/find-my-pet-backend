@@ -1,6 +1,7 @@
 package com.park.animal.common.config
 
 import com.park.animal.common.interceptor.JwtTokenInterceptor
+import com.park.animal.common.resolver.AuthenticationResolver
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import org.springframework.web.servlet.config.annotation.CorsRegistry
@@ -11,6 +12,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 @Configuration
 class WebMvcConfig(
     private val jwtTokenInterceptor: JwtTokenInterceptor,
+    private val authenticationResolver: AuthenticationResolver,
 
 ) : WebMvcConfigurer {
     override fun addResourceHandlers(registry: ResourceHandlerRegistry) {
