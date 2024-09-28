@@ -60,6 +60,14 @@ dependencies {
     // query dsl
     implementation("com.querydsl:querydsl-jpa:5.0.0:jakarta")
     kapt("com.querydsl:querydsl-apt:5.0.0:jakarta")
+
+    // s3
+    implementation("com.amazonaws:aws-java-sdk-s3:1.12.666")
+
+    // coroutine
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    runtimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.6.4")
 }
 
 kotlin {

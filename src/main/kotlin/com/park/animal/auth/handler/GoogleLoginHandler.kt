@@ -4,6 +4,8 @@ import com.park.animal.auth.SocialLoginProvider
 import com.park.animal.auth.SocialLoginProvider.GOOGLE
 import com.park.animal.auth.external.GoogleFeignClient
 import com.park.animal.auth.external.GoogleTokenRequestDto
+import com.park.animal.auth.service.JwtTokenService
+import com.park.animal.auth.service.UserService
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 
@@ -16,7 +18,12 @@ class GoogleLoginHandler(
     @Value("\${auth.google.client-secret}")
     private val clientSecret: String,
     private val googleFeignClient: GoogleFeignClient,
-) : AbstractSocialLoginHandler() {
+    private val userService: UserService,
+    private val jwtTokenService: JwtTokenService,
+) : AbstractSocialLoginHandler(
+    userService = userService,
+    jwtTokenService = jwtTokenService,
+) {
     override fun requestAccessToken(code: String, redirectUri: String): String {
         val request = GoogleTokenRequestDto(
             clientId = clientId,
