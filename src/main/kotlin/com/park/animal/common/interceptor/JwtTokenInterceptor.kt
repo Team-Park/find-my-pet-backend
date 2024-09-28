@@ -1,7 +1,12 @@
 package com.park.animal.common.interceptor
 
+import com.park.animal.auth.service.JwtTokenService
 import com.park.animal.common.annotation.PublicEndPoint
 import com.park.animal.common.constants.AuthConstants
+import com.park.animal.common.constants.AuthConstants.AUTHORIZATION_HEADER
+import com.park.animal.common.constants.AuthConstants.BEARER_PREFIX
+import com.park.animal.common.error.ErrorCode
+import com.park.animal.common.error.exception.NoBearerTokenException
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpMethod
@@ -37,7 +42,7 @@ fun HttpServletRequest.getBearerTokenFromHeader(): String {
                 BEARER_PREFIX.length,
             )
 
-            else -> throw NoBearerTokenException("authorization header contains $token")
+            else -> throw NoBearerTokenException(ErrorCode.NO_BEARER_TOKEN)
         }
-    } ?: throw NoBearerTokenException("authorization header does not exists")
+    } ?: throw NoBearerTokenException(ErrorCode.NO_BEARER_TOKEN)
 }

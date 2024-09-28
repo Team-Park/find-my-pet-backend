@@ -1,5 +1,8 @@
-package com.park.animal.auth
+package com.park.animal.auth.service
 
+import com.park.animal.auth.dto.JwtResponseDto
+import com.park.animal.common.error.ErrorCode
+import com.park.animal.common.error.exception.ParseJwtFailedException
 import io.jsonwebtoken.ExpiredJwtException
 import io.jsonwebtoken.Header
 import io.jsonwebtoken.JwtException
@@ -10,6 +13,7 @@ import io.jsonwebtoken.security.Keys
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import java.util.*
+import com.park.animal.common.error.exception.ExpiredJwtException as CustomExpiredJwtException
 
 @Service
 class JwtTokenService(
@@ -71,9 +75,9 @@ class JwtTokenService(
                 .parseClaimsJws(token)
                 .body
         } catch (e: ExpiredJwtException) {
-            throw ExpiredJwtException(e.message.toString())
+            throw CustomExpiredJwtException(ErrorCode.EXPIRED_JWT)
         } catch (e: JwtException) {
-            throw ParseJwtFailedException("failed to parse jwt: $token ")
+            throw ParseJwtFailedException(ErrorCode.PARSE_JWT_FAILED)
         }
     }
 
@@ -85,9 +89,9 @@ class JwtTokenService(
                 .parseClaimsJws(refreshToken)
                 .body
         } catch (e: ExpiredJwtException) {
-            throw ExpiredJwtException(e.message.toString())
+            throw CustomExpiredJwtException(ErrorCode.EXPIRED_JWT)
         } catch (e: JwtException) {
-            throw ParseJwtFailedException("failed to parse jwt: $refreshToken ")
+            throw ParseJwtFailedException(ErrorCode.PARSE_JWT_FAILED)
         }
     }
 
