@@ -1,0 +1,103 @@
+name: Build image if not exists and Trigger dispatch to deploy
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    outputs:
+      result_image_tag: ${{ steps.generate_image_tag.outputs.image_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set environment variables
+        run: |
+          echo "repository_name=${{ secrets.DOCKERHUB_USERNAME }}/find-my-pet-backend" >> $GITHUB_ENV
+
+      - name: Generate image tag
+        id: generate_image_tag
+        run: |
+          IMAGE_TAG=$(git rev-parse HEAD)
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_ENV
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Docker Hub login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Check if image exists in Docker Hub
+        id: check_image
+        run: |
+          IMAGE=${{ env.repository_name }}
+          TAG=${{ env.image_tag }}
+          if docker manifest inspect ${IMAGE}:${TAG} > /dev/null 2>&1; then
+            echo "image_exists=true" >> $GITHUB_ENV
+          else
+            echo "image_exists=false" >> $GITHUB_ENV
+          fi
+
+      - name: Set up JDK 17
+        if: env.image_exists == 'false'
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: 'adopt'
+
+      - name: Cache Gradle packages
+        if: env.image_exists == 'false'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        if: env.image_exists == 'false'
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        if: env.image_exists == 'false'
+        run: ./gradlew clean build -x test --refresh-dependencies --stacktrace
+
+      - name: Build, tag, and push image to Docker Hub
+        if: env.image_exists == 'false'
+        env:
+          IMAGE_NAME: ${{ env.repository_name }}
+          IMAGE_TAG: ${{ env.image_tag }}
+
+        run: |
+          docker build -f ./api/Dockerfile -t $IMAGE_NAME:$IMAGE_TAG .
+          docker push $IMAGE_NAME:$IMAGE_TAG
+
+  trigger-dispatch:
+    name: Trigger dispatch to deploy
+    needs: check-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set environment variable based on branch
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "DEPLOY_ENV=prod" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_ENV=dev" >> $GITHUB_ENV
+          fi
+
+      - name: Trigger deploy dispatch
+        run: |
+          curl -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.GIT_PASSWORD }}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/PARKPARKWOO/server-deploy/dispatches \
+            -d '{"event_type":"update_app_image_tag","client_payload":{"app":"find-my-pet-backend","environment":"'"${{ env.DEPLOY_ENV }}"'","image_tag":"'"${{ needs.check-and-build.outputs.result_image_tag }}"'"}}'

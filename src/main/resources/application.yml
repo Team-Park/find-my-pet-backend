@@ -33,7 +33,7 @@ auth:
 aws:
   s3:
     secret-key:
-    access-ke:
+    access-key:
     bucket-name:
 
 cloud-front:

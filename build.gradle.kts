@@ -4,6 +4,7 @@ plugins {
     id("org.springframework.boot") version "3.2.4"
     id("io.spring.dependency-management") version "1.1.6"
     kotlin("plugin.jpa") version "1.9.25"
+    id("io.gitlab.arturbosch.detekt") version "1.23.3"
     kotlin("kapt") version "1.9.25"
 }
 
@@ -22,6 +23,15 @@ java {
 repositories {
     mavenCentral()
 }
+
+afterEvaluate {
+    detekt {
+        buildUponDefaultConfig = true
+        config.setFrom(files("$rootDir/detekt-config.yml"))
+    }
+}
+
+val ktlint: Configuration by configurations.creating
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -68,6 +78,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     runtimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.6.4")
+
+    ktlint("com.pinterest.ktlint:ktlint-cli:1.0.1") {
+        attributes {
+            attribute(Bundling.BUNDLING_ATTRIBUTE, objects.named(Bundling.EXTERNAL))
+        }
+    }
 }
 
 kotlin {
@@ -92,4 +108,31 @@ kapt {
     arguments {
         arg("querydsl.sourceDir", "${project.layout.buildDirectory}/generated/querydsl")
     }
+}
+
+
+val ktlintCheck by tasks.registering(JavaExec::class) {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Check Kotlin code style"
+    classpath = ktlint
+    mainClass.set("com.pinterest.ktlint.Main")
+    args(
+        "**/src/**/*.kt",
+        "**.kts",
+        "!**/build/**",
+    )
+}
+
+tasks.register<JavaExec>("ktlintFormat") {
+    group = LifecycleBasePlugin.VERIFICATION_GROUP
+    description = "Check Kotlin code style and format"
+    classpath = ktlint
+    mainClass.set("com.pinterest.ktlint.Main")
+    jvmArgs("--add-opens=java.base/java.lang=ALL-UNNAMED")
+    args(
+        "-F",
+        "**/src/**/*.kt",
+        "**.kts",
+        "!**/build/**",
+    )
 }
