@@ -1,7 +1,7 @@
 package com.park.animal.auth.repository
 
-import com.park.animal.auth.QUser.user
-import com.park.animal.auth.User
+import com.park.animal.auth.entity.QUser.user
+import com.park.animal.auth.entity.User
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID

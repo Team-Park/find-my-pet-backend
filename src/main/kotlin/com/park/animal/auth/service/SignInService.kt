@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service
 class SignInService(
     private val socialLoginFactory: SocialLoginFactory,
 ) {
-    fun signInWithSocial(command: SignInWithSocialCommand): JwtResponseDto? {
+    fun signInWithSocial(command: SignInWithSocialCommand): JwtResponseDto {
         val providerService = socialLoginFactory.getProviderService(command.provider)
         return providerService.handleSocialLogin(
             code = command.code,
