@@ -3,9 +3,11 @@ package com.park.animal.auth.external
 import com.fasterxml.jackson.databind.PropertyNamingStrategies
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import org.springframework.cloud.openfeign.FeignClient
+import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestParam
 
 // https://oauth2.googleapis.com
@@ -13,11 +15,13 @@ import org.springframework.web.bind.annotation.RequestParam
 interface GoogleFeignClient {
     @PostMapping("/token")
     fun getToken(
+        @RequestHeader(name = "Content-type")
+        type: String = MediaType.APPLICATION_FORM_URLENCODED_VALUE,
         @RequestBody
         request: GoogleTokenRequestDto,
     ): GoogleTokenResponseDto
 
-    @GetMapping("oauth2/v3/userinfo")
+    @GetMapping("/oauth2/v3/userinfo")
     fun getUserInfo(@RequestParam("access_token") accessToken: String): GoogleUserInfoDto
 }
 

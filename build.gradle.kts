@@ -45,7 +45,7 @@ dependencies {
 
     // feign
     implementation("org.springframework.cloud:spring-cloud-starter-openfeign")
-    implementation("io.github.openfeign:feign-httpclient:13.2")
+//    implementation("io.github.openfeign:feign-httpclient:13.2")
 
     // jackson
     implementation("com.fasterxml.jackson.core:jackson-core:2.15.2")

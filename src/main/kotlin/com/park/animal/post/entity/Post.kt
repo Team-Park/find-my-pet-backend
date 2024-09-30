@@ -12,13 +12,13 @@ import java.util.UUID
 class Post(
     @JdbcTypeCode(SqlTypes.VARCHAR)
     val author: UUID,
-    val title: String,
-    val phoneNum: String,
-    val time: LocalDateTime,
-    val place: String,
-    val gender: String,
-    val gratuity: Int,
-    val description: String,
+    var title: String,
+    var phoneNum: String,
+    var time: LocalDateTime,
+    var place: String,
+    var gender: String,
+    var gratuity: Int,
+    var description: String,
 ) : BaseEntity() {
     companion object {
         fun createPostFromCommand(command: RegisterPostCommand): Post {
@@ -33,5 +33,23 @@ class Post(
                 gratuity = command.gratuity,
             )
         }
+    }
+
+    fun update(
+        title: String,
+        phoneNum: String,
+        time: LocalDateTime,
+        place: String,
+        gender: String,
+        gratuity: Int,
+        description: String
+    ) {
+        this.gender = gender
+        this.time = time
+        this.title = title
+        this.phoneNum = phoneNum
+        this.place = place
+        this.gratuity = gratuity
+        this.description = description
     }
 }

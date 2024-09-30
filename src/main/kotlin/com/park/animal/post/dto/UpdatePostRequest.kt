@@ -1,10 +1,10 @@
 package com.park.animal.post.dto
 
 import java.time.LocalDateTime
+import java.util.UUID
 
-data class PostDetailResponse(
-    val author: String,
-    var imageUrls: List<PostImageResponse>,
+data class UpdatePostRequest(
+    val postId: UUID,
     val title: String,
     val phoneNum: String,
     val time: LocalDateTime,

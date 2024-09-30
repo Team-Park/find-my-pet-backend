@@ -33,7 +33,7 @@ class GoogleLoginHandler(
             redirectUri = redirectUri,
             grantType = grantType,
         )
-        val token = googleFeignClient.getToken(request)
+        val token = googleFeignClient.getToken(request = request)
         return token.accessToken
     }
 
