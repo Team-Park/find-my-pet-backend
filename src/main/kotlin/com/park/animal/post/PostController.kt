@@ -99,7 +99,7 @@ class PostController(
         @RequestBody
         request: UpdatePostRequest,
     ): SucceededApiResponseBody<Void> {
-        postService.updatePost(request)
+        postService.updatePost(command = request, userId = userContext.userId)
         return SucceededApiResponseBody(data = null)
     }
 

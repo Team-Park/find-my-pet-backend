@@ -12,6 +12,6 @@ class SocialLoginFactory(
         return handlers.stream()
             .filter { i -> i.isApplicable(provider) }
             .findFirst()
-            .orElseThrow { throw RuntimeException() }
+            .orElseThrow()
     }
 }
