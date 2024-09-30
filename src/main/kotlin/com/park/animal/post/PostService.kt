@@ -84,8 +84,11 @@ class PostService(
     }
 
     @Transactional
-    fun updatePost(command: UpdatePostRequest) {
+    fun updatePost(command: UpdatePostRequest, userId: UUID) {
         val post = getPostEntity(command.postId)
+        if (post.author != userId) {
+            throw BusinessException(ErrorCode.UNAUTHORIZED)
+        }
         post.update(
             title = command.title,
             description = command.description,

@@ -17,12 +17,10 @@ class AmazonConfig(
     private val secretKey: String,
 ) {
     @Bean
-    fun amazonS3Client(): AmazonS3 {
-        return AmazonS3ClientBuilder.standard()
-            .withCredentials(
-                AWSStaticCredentialsProvider(BasicAWSCredentials(accessKey, secretKey)),
-            )
-            .withRegion(Regions.AP_NORTHEAST_2)
-            .build()
-    }
+    fun amazonS3Client(): AmazonS3 = AmazonS3ClientBuilder.standard()
+        .withCredentials(
+            AWSStaticCredentialsProvider(BasicAWSCredentials(accessKey, secretKey)),
+        )
+        .withRegion(Regions.AP_NORTHEAST_2)
+        .build()
 }
