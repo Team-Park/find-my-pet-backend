@@ -1,5 +1,6 @@
 package com.park.animal.me
 
+import com.park.animal.auth.service.UserService
 import com.park.animal.common.annotation.AuthenticationUser
 import com.park.animal.common.http.response.SucceededApiResponseBody
 import com.park.animal.common.resolver.UserContext
