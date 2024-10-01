@@ -18,7 +18,9 @@ import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
 
-interface PostRepository : JpaRepository<Post, UUID>, PostQueryRepository
+interface PostRepository : JpaRepository<Post, UUID>, PostQueryRepository {
+    fun findByAuthor(userId: UUID): List<Post>
+}
 
 interface PostQueryRepository {
     fun findPostDetail(postId: UUID): PostDetailResponse?
