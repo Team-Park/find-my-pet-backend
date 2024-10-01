@@ -13,7 +13,11 @@ spring:
       file-size-threshold: 0B
       max-file-size: 100MB
       max-request-size: 100MB
-
+  jpa:
+    show-sql: true
+    hibernate:
+#     추후 flyway 도입 등 고려
+      ddl-auto: update
 jwt:
   access-token:
     secret-key: ${ACCESS_SECRET_KEY}
@@ -25,16 +29,16 @@ jwt:
 auth:
   grant-type: authorization_code
   kakao:
-    client-id:
+    client-id: ${FMP_KAKAO_CLIENT_ID}
   google:
-    client-id:
-    client-secret:
+    client-id: ${FMP_GOOGLE_CLIENT_ID}
+    client-secret: ${FMP_GOOGLE_CLIENT_SECRET}
 
 aws:
   s3:
-    secret-key:
-    access-key:
-    bucket-name:
+    bucket-name: ${AWS_S3_BUCKET_NAME}
+    access-key: ${AWS_S3_ACCESS_KEY}
+    secret-key: ${AWS_S3_SECRET_KEY}
 
 cloud-front:
-  domain:
+  domain: ${CLOUD_FRONT_DOMAIN_NAME}
