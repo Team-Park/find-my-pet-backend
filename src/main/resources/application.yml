@@ -22,11 +22,6 @@ spring:
       file-size-threshold: 0B
       max-file-size: 100MB
       max-request-size: 100MB
-  jpa:
-    show-sql: true
-    hibernate:
-#     추후 flyway 도입 등 고려
-      ddl-auto: update
 jwt:
   access-token:
     secret-key: ${ACCESS_SECRET_KEY}
