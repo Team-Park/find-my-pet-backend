@@ -42,7 +42,7 @@ class Post(
         place: String,
         gender: String,
         gratuity: Int,
-        description: String
+        description: String,
     ) {
         this.gender = gender
         this.time = time
