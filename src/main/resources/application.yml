@@ -6,18 +6,23 @@ spring:
     url: jdbc:mysql://${RDBMS_URI:localhost}:3306/findmypet?useUnicode=yes&characterEncoding=UTF-8&connectTimeout=2000&autoReconnect=true&serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true
     username: ${RDBMS_USERNAME:root}
     password: ${RDBMS_PASSWORD:1234}
-
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 1000
+        dialect: org.hibernate.dialect.MySQLDialect
+    show-sql: true
+    hibernate:
+      # 추후 flyway 등 전환 고려
+      ddl-auto: update
   servlet:
     multipart:
       enabled: true
       file-size-threshold: 0B
       max-file-size: 100MB
       max-request-size: 100MB
-  jpa:
-    show-sql: true
-    hibernate:
-#     추후 flyway 도입 등 고려
-      ddl-auto: update
+
 jwt:
   access-token:
     secret-key: ${ACCESS_SECRET_KEY}
