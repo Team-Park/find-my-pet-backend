@@ -2,10 +2,14 @@ spring:
   config:
     activate:
       on-profile: local
-  jpa:
-    show-sql: true
-    hibernate:
-      ddl-auto: update
+
+auth:
+  grant-type: authorization_code
+  kakao:
+    client-id: asasas
+  google:
+    client-id: asasas
+    client-secret: sasas
 
 auth:
   grant-type: authorization_code
