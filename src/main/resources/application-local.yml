@@ -7,6 +7,14 @@ spring:
     hibernate:
       ddl-auto: update
 
+auth:
+  grant-type: authorization_code
+  kakao:
+    client-id: asasas
+  google:
+    client-id: asasas
+    client-secret: sasas
+
 aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME:bucketName}
