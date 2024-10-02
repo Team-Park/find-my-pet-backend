@@ -2,6 +2,7 @@ package com.park.animal.post
 
 import com.park.animal.common.annotation.AuthenticationUser
 import com.park.animal.common.annotation.PublicEndPoint
+import com.park.animal.common.config.SwaggerConfig
 import com.park.animal.common.constants.OrderBy
 import com.park.animal.common.http.response.PaginatedApiResponseBody
 import com.park.animal.common.http.response.PaginatedApiResponseDto
@@ -13,7 +14,9 @@ import com.park.animal.post.dto.PostSummaryResponse
 import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
 import com.park.animal.post.dto.UpdatePostRequest
+import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
+import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -34,6 +37,9 @@ class PostController(
 ) {
     @GetMapping("/posts")
     @PublicEndPoint
+    @Operation(
+        summary = "게시글 페이지네이션 조회",
+    )
     fun getPosts(
         @RequestParam(name = "pageSize", defaultValue = "20") size: Long,
         @RequestParam(name = "pageOffset", defaultValue = "0") offset: Long,
@@ -62,6 +68,10 @@ class PostController(
     }
 
     @PostMapping(path = ["/post"], consumes = ["multipart/form-data", "application/json"])
+    @Operation(
+        summary = "게시글 등록 API",
+        security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
+    )
     suspend fun registerPost(
         @AuthenticationUser
         @Parameter(hidden = true)
@@ -92,6 +102,10 @@ class PostController(
     }
 
     @PutMapping("/post")
+    @Operation(
+        summary = "게시글 수정 (이미지 제외)",
+        security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
+    )
     fun updatePost(
         @AuthenticationUser
         @Parameter(hidden = true)
@@ -104,6 +118,10 @@ class PostController(
     }
 
     @PostMapping("/post/image")
+    @Operation(
+        summary = "게시글에 이미지 추가",
+        security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
+    )
     fun addPostImage(
         @AuthenticationUser
         @Parameter(hidden = true)
@@ -121,6 +139,10 @@ class PostController(
     }
 
     @DeleteMapping("/post/image")
+    @Operation(
+        summary = "이미지 삭제",
+        security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
+    )
     fun deletePostImage(
         @AuthenticationUser
         @Parameter(hidden = true)
@@ -137,6 +159,10 @@ class PostController(
     }
 
     @DeleteMapping("/post/{id}")
+    @Operation(
+        summary = "게시글 삭제",
+        security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
+    )
     fun deletePost(
         @AuthenticationUser
         @Parameter(hidden = true)
