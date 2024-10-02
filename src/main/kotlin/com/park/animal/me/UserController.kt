@@ -5,6 +5,7 @@ import com.park.animal.common.annotation.AuthenticationUser
 import com.park.animal.common.http.response.SucceededApiResponseBody
 import com.park.animal.common.resolver.UserContext
 import com.park.animal.post.dto.PostSummaryResponse
+import io.swagger.v3.oas.annotations.Parameter
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -16,6 +17,7 @@ class UserController(
 ) {
     @GetMapping("/my-page")
     fun me(
+        @Parameter(hidden = true)
         @AuthenticationUser
         userContext: UserContext,
     ): SucceededApiResponseBody<List<PostSummaryResponse>> {

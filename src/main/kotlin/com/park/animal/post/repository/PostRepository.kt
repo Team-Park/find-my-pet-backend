@@ -76,26 +76,20 @@ class PostQueryRepositoryImpl(
                     post.gratuity,
                     post.place,
                     post.time,
-                    postImage.imageUrl,
-                ),
-            )
-            .from(post)
-            .leftJoin(user).on(post.author.eq(user.id))
-            .leftJoin(userInfo).on(user.id.eq(userInfo.user.id))
-            .leftJoin(postImage).on(postImage.post.id.eq(post.id))
-            .groupBy(post.id)
-            .orderBy(setOrderBy(orderBy))
-            .offset(offset)
-            .limit(size)
-            .where(
-                postImage.id.eq(
-                    JPAExpressions.select(postImage.id)
+                    JPAExpressions.select(postImage.imageUrl)
                         .from(postImage)
                         .where(postImage.post.id.eq(post.id))
                         .orderBy(postImage.id.asc())
                         .limit(1),
                 ),
             )
+            .from(post)
+            .leftJoin(user).on(post.author.eq(user.id))
+            .leftJoin(userInfo).on(user.id.eq(userInfo.user.id))
+            .groupBy(post.id)
+            .orderBy(setOrderBy(orderBy))
+            .offset(offset)
+            .limit(size)
             .fetch()
 
         val totalCount: Long = jpaQueryFactory.select(post.count())
