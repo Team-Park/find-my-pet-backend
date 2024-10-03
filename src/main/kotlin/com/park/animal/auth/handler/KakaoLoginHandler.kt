@@ -4,6 +4,7 @@ import com.park.animal.auth.SocialLoginProvider
 import com.park.animal.auth.SocialLoginProvider.KAKAO
 import com.park.animal.auth.dto.UserInfoDto
 import com.park.animal.auth.external.KakaoFeignClient
+import com.park.animal.auth.external.KakaoOauthClient
 import com.park.animal.auth.service.JwtTokenService
 import com.park.animal.auth.service.UserService
 import com.park.animal.common.constants.AuthConstants
@@ -20,12 +21,13 @@ class KakaoLoginHandler(
     private val kakaoFeignClient: KakaoFeignClient,
     private val userService: UserService,
     private val jwtTokenService: JwtTokenService,
+    private val kakaoOauthClient: KakaoOauthClient,
 ) : AbstractSocialLoginHandler(
     userService = userService,
     jwtTokenService = jwtTokenService,
 ) {
     override fun requestAccessToken(code: String, redirectUri: String): String {
-        val token = kakaoFeignClient.getToken(
+        val token = kakaoOauthClient.getToken(
             grantType = grantType,
             clientId = clientId,
             redirectUri = redirectUri,
