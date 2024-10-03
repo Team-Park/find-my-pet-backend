@@ -8,6 +8,7 @@ import com.park.animal.auth.external.GoogleTokenRequestDto
 import com.park.animal.auth.service.JwtTokenService
 import com.park.animal.auth.service.UserService
 import com.park.animal.common.constants.AuthConstants
+import com.park.animal.redis.RedisDriver
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 
@@ -22,9 +23,11 @@ class GoogleLoginHandler(
     private val googleFeignClient: GoogleFeignClient,
     private val userService: UserService,
     private val jwtTokenService: JwtTokenService,
+    private val redisDriver: RedisDriver,
 ) : AbstractSocialLoginHandler(
     userService = userService,
     jwtTokenService = jwtTokenService,
+    redisDriver = redisDriver,
 ) {
     override fun requestAccessToken(code: String, redirectUri: String): String {
         val request = GoogleTokenRequestDto(

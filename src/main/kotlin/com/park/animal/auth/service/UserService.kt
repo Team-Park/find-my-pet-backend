@@ -38,6 +38,7 @@ class UserService(
         return userRepository.save(user)
     }
 
+    @Transactional
     fun saveUserInfo(user: User, name: String) {
         val userInfo = UserInfo(
             user = user,
@@ -59,6 +60,13 @@ class UserService(
                 place = post.place,
                 thumbnail = null,
             )
+        }
+    }
+
+    @Transactional(readOnly = true)
+    fun findById(userId: UUID): User {
+        return userRepository.findById(userId).orElseThrow {
+            throw BusinessException(ErrorCode.NOT_FOUND_USER)
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.park.animal.auth.service
 
 import com.park.animal.auth.dto.JwtResponseDto
+import com.park.animal.common.constants.AuthConstants
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.ParseJwtFailedException
 import io.jsonwebtoken.ExpiredJwtException
@@ -35,6 +36,8 @@ class JwtTokenService(
         return JwtResponseDto(
             accessToken = accessToken,
             refreshToken = refreshToken,
+            accessTokenExpiresIn = accessTokenExpireTime,
+            refreshTokenExpiresIn = refreshTokenExpireTime,
         )
     }
 
@@ -94,6 +97,9 @@ class JwtTokenService(
             throw ParseJwtFailedException(ErrorCode.PARSE_JWT_FAILED)
         }
     }
+
+    fun getUserIdByRefreshToken(refreshToken: String): UUID =
+        UUID.fromString(parseRefreshToken(refreshTokenSecretKeyString)[AuthConstants.USER_ID].toString())
 
     companion object {
         fun minKeyStringLength(algorithm: SignatureAlgorithm) = algorithm.minKeyLength.let { (it + 5) / 6 }
