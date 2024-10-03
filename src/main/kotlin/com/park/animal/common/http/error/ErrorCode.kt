@@ -20,4 +20,6 @@ enum class ErrorCode(
     NOT_FOUND_POST("게시글 상세조회 실패"),
     FAILURE_UPLOAD_IMAGE("이미지 업로드하는데 실패했습니다."),
     NOT_FOUND_POST_IMAGE("게시글 이미지 조회 실패"),
+
+    UNKNOWN_ERROR("알 수 없는 에러"),
 }

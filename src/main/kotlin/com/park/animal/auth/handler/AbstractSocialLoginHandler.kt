@@ -6,12 +6,15 @@ import com.park.animal.auth.dto.UserInfoDto
 import com.park.animal.auth.entity.User
 import com.park.animal.auth.service.JwtTokenService
 import com.park.animal.auth.service.UserService
+import com.park.animal.redis.RedisConstant
+import com.park.animal.redis.RedisDriver
 import org.springframework.stereotype.Component
 
 @Component
 abstract class AbstractSocialLoginHandler(
     private val userService: UserService,
     private val jwtTokenService: JwtTokenService,
+    private val redisDriver: RedisDriver,
 ) {
     abstract fun requestAccessToken(code: String, redirectUri: String): String
 
@@ -23,10 +26,17 @@ abstract class AbstractSocialLoginHandler(
         val accessToken = requestAccessToken(code, redirectUri)
         val userInfo = getUserInfoId(accessToken)
         val user: User = userService.findBySocialId(userInfo.socialId) ?: run {
-            userService.saveUser(provider = provider, socialId = userInfo.socialId)
+            val saveUser = userService.saveUser(provider = provider, socialId = userInfo.socialId)
+            createUserInfo(userInfo, saveUser)
+            saveUser
         }
-        createUserInfo(userInfo, user)
-        return jwtTokenService.build(user.getClaims())
+        val tokenResponse = jwtTokenService.build(user.getClaims())
+        redisDriver.setValue(
+            RedisConstant.REFRESH_TOKEN_PREFIX + user.id,
+            tokenResponse.refreshToken,
+            tokenResponse.refreshTokenExpiresIn,
+        )
+        return tokenResponse
     }
 
     protected fun createUserInfo(userInfo: UserInfoDto, user: User) {

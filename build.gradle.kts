@@ -68,6 +68,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
     runtimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-reactive:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.6.4")
+
+    // redis
+    implementation("org.springframework.boot:spring-boot-starter-data-redis")
+    implementation("org.redisson:redisson:3.26.0")
 }
 
 kotlin {

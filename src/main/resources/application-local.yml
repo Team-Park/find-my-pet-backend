@@ -2,7 +2,11 @@ spring:
   config:
     activate:
       on-profile: local
-
+  data:
+    redis:
+      port: 6379
+      host: localhost
+      password: healthgood1!
 auth:
   grant-type: authorization_code
   kakao:

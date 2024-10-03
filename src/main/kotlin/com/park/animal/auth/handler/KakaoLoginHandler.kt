@@ -8,6 +8,7 @@ import com.park.animal.auth.external.KakaoOauthClient
 import com.park.animal.auth.service.JwtTokenService
 import com.park.animal.auth.service.UserService
 import com.park.animal.common.constants.AuthConstants
+import com.park.animal.redis.RedisDriver
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import kotlin.random.Random
@@ -22,9 +23,11 @@ class KakaoLoginHandler(
     private val userService: UserService,
     private val jwtTokenService: JwtTokenService,
     private val kakaoOauthClient: KakaoOauthClient,
+    private val redisDriver: RedisDriver,
 ) : AbstractSocialLoginHandler(
     userService = userService,
     jwtTokenService = jwtTokenService,
+    redisDriver = redisDriver,
 ) {
     override fun requestAccessToken(code: String, redirectUri: String): String {
         val token = kakaoOauthClient.getToken(
