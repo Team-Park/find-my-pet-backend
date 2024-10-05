@@ -41,9 +41,9 @@ class PostController(
         summary = "게시글 페이지네이션 조회",
     )
     fun getPosts(
-        @RequestParam(name = "pageSize", defaultValue = "20") size: Long,
-        @RequestParam(name = "pageOffset", defaultValue = "0") offset: Long,
-        @RequestParam(name = "orderBy", defaultValue = "CREATED_AT_DESC") orderBy: OrderBy,
+        @RequestParam(name = "pageSize", required = false, defaultValue = "20") size: Long,
+        @RequestParam(name = "pageOffset", required = false, defaultValue = "0") offset: Long,
+        @RequestParam(name = "orderBy", required = false, defaultValue = "CREATED_AT_DESC") orderBy: OrderBy,
     ): PaginatedApiResponseBody<PostSummaryResponse> {
         val query: SummarizedPostsByPageQuery = SummarizedPostsByPageQuery(
             size = size,
