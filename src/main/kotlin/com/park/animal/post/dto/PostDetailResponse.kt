@@ -4,7 +4,6 @@ import java.time.LocalDateTime
 
 data class PostDetailResponse(
     val author: String,
-    var imageUrls: List<PostImageResponse>,
     val title: String,
     val phoneNum: String,
     val time: LocalDateTime,
@@ -12,4 +11,6 @@ data class PostDetailResponse(
     val gender: String,
     val gratuity: Int,
     val description: String,
+    val coordinate: Coordinate,
+    var imageUrls: List<PostImageResponse> = emptyList(),
 )

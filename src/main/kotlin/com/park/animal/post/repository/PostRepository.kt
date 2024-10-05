@@ -3,6 +3,7 @@ package com.park.animal.post.repository
 import com.park.animal.auth.entity.QUser.user
 import com.park.animal.auth.entity.QUserInfo.userInfo
 import com.park.animal.common.constants.OrderBy
+import com.park.animal.post.dto.Coordinate
 import com.park.animal.post.dto.PostDetailResponse
 import com.park.animal.post.dto.PostImageResponse
 import com.park.animal.post.dto.PostSummaryResponse
@@ -23,7 +24,7 @@ interface PostRepository : JpaRepository<Post, UUID>, PostQueryRepository {
 }
 
 interface PostQueryRepository {
-    fun findPostDetail(postId: UUID): PostDetailResponse?
+    fun findPostDetailWithImages(postId: UUID): PostDetailResponse?
 
     fun findSummarizedPostsByPage(size: Long, offset: Long, orderBy: OrderBy): SummarizedPostsByPageDto
 }
@@ -31,8 +32,17 @@ interface PostQueryRepository {
 class PostQueryRepositoryImpl(
     private val jpaQueryFactory: JPAQueryFactory,
 ) : PostQueryRepository {
-    override fun findPostDetail(postId: UUID): PostDetailResponse? {
-        val postDetail = jpaQueryFactory.select(
+    override fun findPostDetailWithImages(postId: UUID): PostDetailResponse? {
+        val postDetail = findPostDetail(postId)
+        val postImages = findPostImages(postId)
+
+        return postDetail?.apply {
+            this.imageUrls = postImages
+        }
+    }
+
+    private fun findPostDetail(postId: UUID): PostDetailResponse? {
+        return jpaQueryFactory.select(
             Projections.constructor(
                 PostDetailResponse::class.java,
                 userInfo.name,
@@ -43,14 +53,21 @@ class PostQueryRepositoryImpl(
                 post.gender,
                 post.gratuity,
                 post.description,
+                Projections.constructor(
+                    Coordinate::class.java,
+                    post.lat,
+                    post.lng,
+                ),
             ),
         )
             .from(post)
-            .leftJoin(userInfo).on(userInfo.user.eq(user)).fetchJoin()
+            .leftJoin(userInfo).on(userInfo.user.id.eq(post.author)).fetchJoin()
             .where(post.id.eq(postId))
             .fetchOne()
+    }
 
-        val postImages = jpaQueryFactory.select(
+    private fun findPostImages(postId: UUID): List<PostImageResponse> {
+        return jpaQueryFactory.select(
             Projections.constructor(
                 PostImageResponse::class.java,
                 postImage.id,
@@ -60,10 +77,6 @@ class PostQueryRepositoryImpl(
             .from(postImage)
             .where(postImage.post.id.eq(postId))
             .fetch()
-
-        return postDetail?.apply {
-            this.imageUrls = postImages
-        }
     }
 
     override fun findSummarizedPostsByPage(size: Long, offset: Long, orderBy: OrderBy): SummarizedPostsByPageDto {

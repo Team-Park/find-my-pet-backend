@@ -41,9 +41,9 @@ class PostController(
         summary = "게시글 페이지네이션 조회",
     )
     fun getPosts(
-        @RequestParam(name = "pageSize", defaultValue = "20") size: Long,
-        @RequestParam(name = "pageOffset", defaultValue = "0") offset: Long,
-        @RequestParam(name = "orderBy", defaultValue = "CREATED_AT_DESC") orderBy: OrderBy,
+        @RequestParam(name = "pageSize", required = false, defaultValue = "20") size: Long,
+        @RequestParam(name = "pageOffset", required = false, defaultValue = "0") offset: Long,
+        @RequestParam(name = "orderBy", required = false, defaultValue = "CREATED_AT_DESC") orderBy: OrderBy,
     ): PaginatedApiResponseBody<PostSummaryResponse> {
         val query: SummarizedPostsByPageQuery = SummarizedPostsByPageQuery(
             size = size,
@@ -81,9 +81,11 @@ class PostController(
         @RequestParam time: LocalDateTime,
         @RequestParam place: String,
         @RequestParam gender: String,
-        @RequestParam gratuity: Int,
+        @RequestParam(required = false, defaultValue = "0") gratuity: Int,
         @RequestParam description: String,
-        @RequestParam image: List<MultipartFile>,
+        @RequestParam(required = false) image: List<MultipartFile> = emptyList(),
+        @RequestParam lat: Double,
+        @RequestParam lng: Double,
     ): SucceededApiResponseBody<Void> {
         postService.registerPost(
             RegisterPostCommand(
@@ -96,6 +98,8 @@ class PostController(
                 gender = gender,
                 gratuity = gratuity,
                 description = description,
+                lat = lat,
+                lng = lng,
             ),
         )
         return SucceededApiResponseBody(data = null)
@@ -128,7 +132,6 @@ class PostController(
         userContext: UserContext,
         @RequestParam image: List<MultipartFile>,
         @RequestParam postId: UUID,
-
     ): SucceededApiResponseBody<Void> {
         postService.addPostImage(
             images = image,

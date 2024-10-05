@@ -61,7 +61,7 @@ class PostService(
     }
 
     @Transactional(readOnly = true)
-    fun findDetailPost(id: UUID): PostDetailResponse = postRepository.findPostDetail(id)
+    fun findDetailPost(id: UUID): PostDetailResponse = postRepository.findPostDetailWithImages(id)
         ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
 
     @Transactional(readOnly = true)
@@ -97,6 +97,8 @@ class PostService(
             time = command.time,
             gender = command.gender,
             gratuity = command.gratuity,
+            lat = command.lat,
+            lng = command.lng,
         )
     }
 
