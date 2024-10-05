@@ -132,7 +132,6 @@ class PostController(
         userContext: UserContext,
         @RequestParam image: List<MultipartFile>,
         @RequestParam postId: UUID,
-
     ): SucceededApiResponseBody<Void> {
         postService.addPostImage(
             images = image,
