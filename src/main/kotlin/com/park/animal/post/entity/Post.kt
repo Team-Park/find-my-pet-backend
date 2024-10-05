@@ -2,6 +2,7 @@ package com.park.animal.post.entity
 
 import com.park.animal.common.persistence.BaseEntity
 import com.park.animal.post.dto.RegisterPostCommand
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.type.SqlTypes
@@ -12,13 +13,24 @@ import java.util.UUID
 class Post(
     @JdbcTypeCode(SqlTypes.VARCHAR)
     val author: UUID,
+    @Column(name = "title")
     var title: String,
+    @Column(name = "phone_num")
     var phoneNum: String,
+    @Column(name = "time")
     var time: LocalDateTime,
+    @Column(name = "place")
     var place: String,
+    @Column(name = "gender")
     var gender: String,
+    @Column(name = "gratuity")
     var gratuity: Int,
+    @Column(name = "description")
     var description: String,
+    @Column(name = "lat")
+    var lat: Double,
+    @Column(name = "lng")
+    var lng: Double,
 ) : BaseEntity() {
     companion object {
         fun createPostFromCommand(command: RegisterPostCommand): Post {
@@ -31,6 +43,8 @@ class Post(
                 description = command.description,
                 gender = command.gender,
                 gratuity = command.gratuity,
+                lat = command.lat,
+                lng = command.lng,
             )
         }
     }
@@ -43,6 +57,8 @@ class Post(
         gender: String,
         gratuity: Int,
         description: String,
+        lat: Double,
+        lng: Double,
     ) {
         this.gender = gender
         this.time = time
@@ -51,5 +67,7 @@ class Post(
         this.place = place
         this.gratuity = gratuity
         this.description = description
+        this.lat = lat
+        this.lng = lng
     }
 }

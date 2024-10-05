@@ -1,6 +1,7 @@
 package com.park.animal.auth.service
 
 import com.park.animal.auth.dto.JwtResponseDto
+import com.park.animal.auth.dto.SignInResponse
 import com.park.animal.auth.dto.SignInWithSocialCommand
 import com.park.animal.auth.factory.SocialLoginFactory
 import com.park.animal.common.http.error.ErrorCode
@@ -16,7 +17,7 @@ class SignInService(
     private val redisDriver: RedisDriver,
     private val userService: UserService,
 ) {
-    fun signInWithSocial(command: SignInWithSocialCommand): JwtResponseDto {
+    fun signInWithSocial(command: SignInWithSocialCommand): SignInResponse {
         val providerService = socialLoginFactory.getProviderService(command.provider)
         return providerService.handleSocialLogin(
             code = command.code,

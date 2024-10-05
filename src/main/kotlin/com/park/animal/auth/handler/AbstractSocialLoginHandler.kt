@@ -2,6 +2,7 @@ package com.park.animal.auth.handler
 
 import com.park.animal.auth.SocialLoginProvider
 import com.park.animal.auth.dto.JwtResponseDto
+import com.park.animal.auth.dto.SignInResponse
 import com.park.animal.auth.dto.UserInfoDto
 import com.park.animal.auth.entity.User
 import com.park.animal.auth.service.JwtTokenService
@@ -22,7 +23,7 @@ abstract class AbstractSocialLoginHandler(
 
     abstract fun getUserInfoId(accessToken: String): UserInfoDto
 
-    fun handleSocialLogin(code: String, redirectUri: String, provider: SocialLoginProvider): JwtResponseDto {
+    fun handleSocialLogin(code: String, redirectUri: String, provider: SocialLoginProvider): SignInResponse {
         val accessToken = requestAccessToken(code, redirectUri)
         val userInfo = getUserInfoId(accessToken)
         val user: User = userService.findBySocialId(userInfo.socialId) ?: run {
@@ -36,7 +37,13 @@ abstract class AbstractSocialLoginHandler(
             tokenResponse.refreshToken,
             tokenResponse.refreshTokenExpiresIn,
         )
-        return tokenResponse
+        return SignInResponse(
+            accessToken = tokenResponse.accessToken,
+            refreshToken = tokenResponse.refreshToken,
+            accessTokenExpiresIn = tokenResponse.accessTokenExpiresIn,
+            refreshTokenExpiresIn = tokenResponse.refreshTokenExpiresIn,
+            name = userInfo.name,
+        )
     }
 
     protected fun createUserInfo(userInfo: UserInfoDto, user: User) {

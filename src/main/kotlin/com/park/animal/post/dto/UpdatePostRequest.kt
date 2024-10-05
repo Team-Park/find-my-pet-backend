@@ -12,4 +12,6 @@ data class UpdatePostRequest(
     val gender: String,
     val gratuity: Int,
     val description: String,
+    val lat: Double,
+    val lng: Double,
 )

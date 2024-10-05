@@ -2,6 +2,7 @@ package com.park.animal.auth.controller
 
 import com.park.animal.auth.dto.JwtResponseDto
 import com.park.animal.auth.dto.ReissueAccessTokenRequest
+import com.park.animal.auth.dto.SignInResponse
 import com.park.animal.auth.dto.SignInWithSocialRequest
 import com.park.animal.auth.service.SignInService
 import com.park.animal.common.annotation.PublicEndPoint
@@ -27,7 +28,7 @@ class SignInController(
             소셜로그인과는 무관합니다.
         """,
     )
-    fun kakaoLogin(@RequestBody request: SignInWithSocialRequest): SucceededApiResponseBody<JwtResponseDto> {
+    fun kakaoLogin(@RequestBody request: SignInWithSocialRequest): SucceededApiResponseBody<SignInResponse> {
         val response = signInService.signInWithSocial(request.toKaKaoCommand())
         return SucceededApiResponseBody(data = response)
     }
@@ -42,7 +43,7 @@ class SignInController(
             소셜로그인과는 무관합니다.
         """,
     )
-    fun signInWithGoogle(@RequestBody request: SignInWithSocialRequest): SucceededApiResponseBody<JwtResponseDto> {
+    fun signInWithGoogle(@RequestBody request: SignInWithSocialRequest): SucceededApiResponseBody<SignInResponse> {
         val response = signInService.signInWithSocial(request.toGoogleCommand())
         return SucceededApiResponseBody(data = response)
     }

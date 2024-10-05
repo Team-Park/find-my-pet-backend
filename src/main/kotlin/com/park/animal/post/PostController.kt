@@ -81,9 +81,11 @@ class PostController(
         @RequestParam time: LocalDateTime,
         @RequestParam place: String,
         @RequestParam gender: String,
-        @RequestParam gratuity: Int,
+        @RequestParam(required = false, defaultValue = "0") gratuity: Int,
         @RequestParam description: String,
-        @RequestParam image: List<MultipartFile>,
+        @RequestParam(required = false) image: List<MultipartFile> = emptyList(),
+        @RequestParam lat: Double,
+        @RequestParam lng: Double,
     ): SucceededApiResponseBody<Void> {
         postService.registerPost(
             RegisterPostCommand(
@@ -96,6 +98,8 @@ class PostController(
                 gender = gender,
                 gratuity = gratuity,
                 description = description,
+                lat = lat,
+                lng = lng,
             ),
         )
         return SucceededApiResponseBody(data = null)
