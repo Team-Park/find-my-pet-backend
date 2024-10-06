@@ -84,6 +84,7 @@ class PostQueryRepositoryImpl(
             .select(
                 Projections.constructor(
                     PostSummaryResponse::class.java,
+                    post.id,
                     userInfo.name,
                     post.title,
                     post.gratuity,

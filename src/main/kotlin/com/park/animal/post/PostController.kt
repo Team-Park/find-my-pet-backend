@@ -78,7 +78,9 @@ class PostController(
         userContext: UserContext,
         @RequestParam title: String,
         @RequestParam phoneNum: String,
-        @RequestParam time: LocalDateTime,
+        @RequestParam
+        @Parameter(example = "2000-10-31T01:30:00")
+        time: LocalDateTime,
         @RequestParam place: String,
         @RequestParam gender: String,
         @RequestParam(required = false, defaultValue = "0") gratuity: Int,

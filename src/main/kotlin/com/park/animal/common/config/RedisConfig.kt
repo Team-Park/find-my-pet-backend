@@ -56,9 +56,7 @@ class RedisConfig(
     fun redissonClient(): RedissonClient {
         val config = org.redisson.config.Config()
         config.useSingleServer().setAddress("$REDISSON_PREFIX$host:$port")
-        if (active != "local") {
-            config.useSingleServer().setPassword(password)
-        }
+        config.useSingleServer().setPassword(password)
         return Redisson.create(config)
     }
 
