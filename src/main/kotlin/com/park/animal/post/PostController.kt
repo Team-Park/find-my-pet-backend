@@ -112,15 +112,14 @@ class PostController(
         summary = "게시글 수정 (이미지 제외)",
         security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
     )
-    @PublicEndPoint
     fun updatePost(
-//        @AuthenticationUser
-//        @Parameter(hidden = true)
-//        userContext: UserContext,
+        @AuthenticationUser
+        @Parameter(hidden = true)
+        userContext: UserContext,
         @RequestBody
         request: UpdatePostRequest,
     ): SucceededApiResponseBody<Void> {
-        postService.updatePost(command = request, userId = UUID.fromString("9c39893e-f4b5-4eb2-9e23-e8b7dc527be2") )//userContext.userId)
+        postService.updatePost(command = request, userId = userContext.userId)
         return SucceededApiResponseBody(data = null)
     }
 
