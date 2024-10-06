@@ -78,7 +78,9 @@ class PostController(
         userContext: UserContext,
         @RequestParam title: String,
         @RequestParam phoneNum: String,
-        @RequestParam time: LocalDateTime,
+        @RequestParam
+        @Parameter(example = "2000-10-31T01:30:00")
+        time: LocalDateTime,
         @RequestParam place: String,
         @RequestParam gender: String,
         @RequestParam(required = false, defaultValue = "0") gratuity: Int,
@@ -110,14 +112,15 @@ class PostController(
         summary = "게시글 수정 (이미지 제외)",
         security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
     )
+    @PublicEndPoint
     fun updatePost(
-        @AuthenticationUser
-        @Parameter(hidden = true)
-        userContext: UserContext,
+//        @AuthenticationUser
+//        @Parameter(hidden = true)
+//        userContext: UserContext,
         @RequestBody
         request: UpdatePostRequest,
     ): SucceededApiResponseBody<Void> {
-        postService.updatePost(command = request, userId = userContext.userId)
+        postService.updatePost(command = request, userId = UUID.fromString("9c39893e-f4b5-4eb2-9e23-e8b7dc527be2") )//userContext.userId)
         return SucceededApiResponseBody(data = null)
     }
 

@@ -59,6 +59,7 @@ class UserService(
                 gratuity = post.gratuity,
                 place = post.place,
                 thumbnail = null,
+                id = post.id,
             )
         }
     }

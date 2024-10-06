@@ -12,5 +12,6 @@ data class PostDetailResponse(
     val gratuity: Int,
     val description: String,
     val coordinate: Coordinate,
-    var imageUrls: List<PostImageResponse> = emptyList(),
-)
+) {
+    lateinit var imageUrls: List<PostImageResponse>
+}
