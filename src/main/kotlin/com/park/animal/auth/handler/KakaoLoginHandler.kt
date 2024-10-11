@@ -50,6 +50,8 @@ class KakaoLoginHandler(
         return UserInfoDto(
             socialId = id,
             name = kakaoUserInfo.kakaoAccount?.profile?.nickname ?: "임시닉네임${Random.nextInt()}",
+            provider = KAKAO,
+            email = kakaoUserInfo.kakaoAccount?.email,
         )
     }
 }

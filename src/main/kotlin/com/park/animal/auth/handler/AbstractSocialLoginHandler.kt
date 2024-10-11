@@ -1,7 +1,6 @@
 package com.park.animal.auth.handler
 
 import com.park.animal.auth.SocialLoginProvider
-import com.park.animal.auth.dto.JwtResponseDto
 import com.park.animal.auth.dto.SignInResponse
 import com.park.animal.auth.dto.UserInfoDto
 import com.park.animal.auth.entity.User
@@ -43,6 +42,8 @@ abstract class AbstractSocialLoginHandler(
             accessTokenExpiresIn = tokenResponse.accessTokenExpiresIn,
             refreshTokenExpiresIn = tokenResponse.refreshTokenExpiresIn,
             name = userInfo.name,
+            email = userInfo.email,
+            provider = userInfo.provider,
         )
     }
 
