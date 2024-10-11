@@ -44,7 +44,12 @@ class GoogleLoginHandler(
 
     override fun getUserInfoId(accessToken: String): UserInfoDto {
         return googleFeignClient.getUserInfo(accessToken = AuthConstants.BEARER_PREFIX + accessToken).let {
-            UserInfoDto(socialId = it.id, name = it.name)
+            UserInfoDto(
+                socialId = it.id,
+                name = it.name,
+                email = it.email,
+                provider = GOOGLE,
+            )
         }
     }
 }
