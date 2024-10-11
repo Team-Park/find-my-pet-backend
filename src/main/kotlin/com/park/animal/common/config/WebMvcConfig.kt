@@ -31,6 +31,7 @@ class WebMvcConfig(
             .allowedOriginPatterns(
                 "http://localhost:[*]",
                 "https://localhost:[*]",
+                "https://find-my-pet-frontend.vercel.app",
             )
             .allowedHeaders("*")
             .allowedMethods("*")
