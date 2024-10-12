@@ -25,11 +25,11 @@ abstract class AbstractSocialLoginHandler(
     fun handleSocialLogin(code: String, redirectUri: String, provider: SocialLoginProvider): SignInResponse {
         val accessToken = requestAccessToken(code, redirectUri)
         val userInfo = getUserInfoId(accessToken)
-        val user: User = userService.findBySocialId(userInfo.socialId) ?: run {
-            val saveUser = userService.saveUser(provider = provider, socialId = userInfo.socialId)
-            createUserInfo(userInfo, saveUser)
-            saveUser
-        }
+        val user: User = findUserOrCreateUserIfNotExist(
+            socialId = userInfo.socialId,
+            provider = provider,
+            name = userInfo.name,
+        )
         val tokenResponse = jwtTokenService.build(user.getClaims())
         redisDriver.setValue(
             RedisConstant.REFRESH_TOKEN_PREFIX + user.id,
@@ -47,7 +47,10 @@ abstract class AbstractSocialLoginHandler(
         )
     }
 
-    protected fun createUserInfo(userInfo: UserInfoDto, user: User) {
-        userService.saveUserInfo(user = user, name = userInfo.name)
-    }
+    private fun findUserOrCreateUserIfNotExist(socialId: String, provider: SocialLoginProvider, name: String) =
+        userService.findBySocialId(socialId) ?: run {
+            val saveUser = userService.saveUser(provider = provider, socialId = socialId)
+            userService.saveUserInfo(user = saveUser, name = name)
+            saveUser
+        }
 }
