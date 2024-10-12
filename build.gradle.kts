@@ -72,6 +72,11 @@ dependencies {
     // redis
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.redisson:redisson:3.26.0")
+
+
+    // for metric
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 }
 
 kotlin {
