@@ -34,13 +34,13 @@ class PostService(
     suspend fun registerPost(command: RegisterPostCommand) {
         coroutineScope {
             val post = Post.createPostFromCommand(command)
-            withContext(Dispatchers.IO) {
+            val postEntity = withContext(Dispatchers.IO) {
                 postRepository.save(post)
             }
             if (command.images.isNotEmpty()) {
                 val uploadImages = uploadImages(command.images)
                 withContext(Dispatchers.IO) {
-                    savePostImages(post, uploadImages)
+                    savePostImages(postEntity, uploadImages)
                 }
             }
         }
