@@ -73,10 +73,12 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.redisson:redisson:3.26.0")
 
-
     // for metric
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+
+    // log-loki
+    implementation("com.github.loki4j:loki-logback-appender:1.5.1")
 }
 
 kotlin {

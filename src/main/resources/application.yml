@@ -1,6 +1,8 @@
 spring:
   profiles:
-    active:
+    active: dev
+  application:
+    name: ${spring.application.name}-fmp-backend
   data:
     redis:
       port: ${REDIS_PORT:6379}
