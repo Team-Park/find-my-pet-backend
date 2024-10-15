@@ -11,15 +11,20 @@
                 <pattern>app=${appName},host=${HOSTNAME},level=%level</pattern>
                 <readMarkers>true</readMarkers>
             </label>
+<!--            <message>-->
+<!--                <pattern>-->
+<!--                    {-->
+<!--                    "level":"%level",-->
+<!--                    "class":"%logger{36}",-->
+<!--                    "thread":"%thread",-->
+<!--                    "message": "%message",-->
+<!--                    "traceId": "%X{X-Request-ID}"-->
+<!--                    }-->
+<!--                </pattern>-->
+<!--            </message>-->
             <message>
                 <pattern>
-                    {
-                    "level":"%level",
-                    "class":"%logger{36}",
-                    "thread":"%thread",
-                    "message": "%message",
-                    "traceId": "%X{X-Request-ID}"
-                    }
+                    traceId=%X{X-Request-ID} class=%logger{36} thread=%thread message="%message"
                 </pattern>
             </message>
         </format>
