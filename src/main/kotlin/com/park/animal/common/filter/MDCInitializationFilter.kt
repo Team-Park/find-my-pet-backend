@@ -8,7 +8,7 @@ import jakarta.servlet.http.HttpServletRequest
 import org.slf4j.MDC
 import java.util.UUID
 
-class TraceIdInitializationFilter : Filter {
+class MDCInitializationFilter : Filter {
     override fun doFilter(request: ServletRequest?, response: ServletResponse?, chain: FilterChain?) {
         val httpRequest = request as HttpServletRequest
         var traceId = httpRequest.getHeader("X-Request-ID")
@@ -18,11 +18,13 @@ class TraceIdInitializationFilter : Filter {
         }
 
         MDC.put("X-Request-ID", traceId)
+        MDC.put("method", httpRequest.method)
 
         try {
             chain!!.doFilter(request, response)
         } finally {
             MDC.remove("X-Request-ID")
+            MDC.remove("method")
         }
     }
 }
