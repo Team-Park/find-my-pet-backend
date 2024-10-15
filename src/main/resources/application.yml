@@ -34,8 +34,7 @@ management:
   endpoints:
     web:
       exposure:
-        # 지금은 개발단계 모두 노출
-        include: all
+        include: health,info,metrics,prometheus
 
 # custom env
 jwt:
