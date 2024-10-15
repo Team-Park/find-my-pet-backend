@@ -8,7 +8,7 @@
         </http>
         <format>
             <label>
-                <pattern>app=${appName},host=${HOSTNAME},level=%level, %X{method:-UNKNOWN}</pattern>
+                <pattern>app=${appName},host=${HOSTNAME},level=%level, method=%X{method:-UNKNOWN}</pattern>
                 <readMarkers>true</readMarkers>
             </label>
             <message>
