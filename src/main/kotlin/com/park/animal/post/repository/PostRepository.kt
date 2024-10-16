@@ -14,6 +14,8 @@ import com.park.animal.post.entity.QPostImage.postImage
 import com.querydsl.core.types.Order
 import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.core.types.Projections
+import com.querydsl.core.types.dsl.ComparablePath
+import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
@@ -99,7 +101,7 @@ class PostQueryRepositoryImpl(
             .leftJoin(userInfo).on(user.id.eq(userInfo.user.id))
             .leftJoin(postImage).on(postImage.post.id.eq(post.id))
             .where(
-                postImage.createdAt.eq(postImage.createdAt.min())
+                postImage.createdAt.eq(getCreatedAtMinValueFromPostImage(post.id))
                     .and(postImage.deletedAt.isNull)
                     .and(post.deletedAt.isNull),
             )
@@ -119,6 +121,11 @@ class PostQueryRepositoryImpl(
         )
     }
 
+    private fun getCreatedAtMinValueFromPostImage(postId: ComparablePath<UUID>) =
+        JPAExpressions.select(postImage.createdAt.min())
+            .from(postImage)
+            .where(postImage.post.id.eq(postId))
+
     override fun findSummarizedPostsByUserId(userId: UUID): List<PostSummaryResponse> {
         return jpaQueryFactory
             .select(
@@ -137,7 +144,8 @@ class PostQueryRepositoryImpl(
             .where(post.author.eq(userId))
             .leftJoin(postImage).on(postImage.post.id.eq(post.id))
             .where(
-                postImage.createdAt.eq(postImage.createdAt.min())
+                postImage.createdAt.eq(getCreatedAtMinValueFromPostImage(post.id))
+                    .and(postImage.deletedAt.isNull)
                     .and(postImage.deletedAt.isNull),
             )
             .leftJoin(userInfo).on(userInfo.user.id.eq(userId))
