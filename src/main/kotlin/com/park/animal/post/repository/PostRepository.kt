@@ -14,7 +14,6 @@ import com.park.animal.post.entity.QPostImage.postImage
 import com.querydsl.core.types.Order
 import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.core.types.Projections
-import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.jpa.repository.JpaRepository
 import java.util.UUID
@@ -92,16 +91,18 @@ class PostQueryRepositoryImpl(
                     post.gratuity,
                     post.place,
                     post.time,
-                    JPAExpressions.select(postImage.imageUrl)
-                        .from(postImage)
-                        .where(postImage.post.id.eq(post.id))
-                        .orderBy(postImage.id.asc())
-                        .limit(1),
+                    postImage.imageUrl,
                 ),
             )
             .from(post)
             .leftJoin(user).on(post.author.eq(user.id))
             .leftJoin(userInfo).on(user.id.eq(userInfo.user.id))
+            .leftJoin(postImage).on(postImage.post.id.eq(post.id))
+            .where(
+                postImage.createdAt.eq(postImage.createdAt.min())
+                    .and(postImage.deletedAt.isNull)
+                    .and(post.deletedAt.isNull),
+            )
             .orderBy(setOrderBy(orderBy))
             .offset(offset)
             .limit(size)
@@ -129,15 +130,16 @@ class PostQueryRepositoryImpl(
                     post.gratuity,
                     post.place,
                     post.time,
-                    JPAExpressions.select(postImage.imageUrl)
-                        .from(postImage)
-                        .where(postImage.post.id.eq(post.id))
-                        .orderBy(postImage.id.asc())
-                        .limit(1),
+                    postImage.imageUrl,
                 ),
             )
             .from(post)
             .where(post.author.eq(userId))
+            .leftJoin(postImage).on(postImage.post.id.eq(post.id))
+            .where(
+                postImage.createdAt.eq(postImage.createdAt.min())
+                    .and(postImage.deletedAt.isNull),
+            )
             .leftJoin(userInfo).on(userInfo.user.id.eq(userId))
             .fetch()
     }
