@@ -19,12 +19,13 @@ class MDCInitializationFilter : Filter {
 
         MDC.put("X-Request-ID", traceId)
         MDC.put("method", httpRequest.method)
-
+        MDC.put("path", request.requestURI)
         try {
             chain!!.doFilter(request, response)
         } finally {
             MDC.remove("X-Request-ID")
             MDC.remove("method")
+            MDC.remove("path")
         }
     }
 }
