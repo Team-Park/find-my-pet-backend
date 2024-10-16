@@ -49,19 +49,7 @@ class UserService(
 
     @Transactional(readOnly = true)
     fun myPage(userId: UUID): List<PostSummaryResponse> {
-        val userInfo = userInfoRepository.findUserInfoByUserId(userId)
-            ?: throw BusinessException(ErrorCode.NOT_FOUND_USER)
-        return postRepository.findByAuthor(userId).map { post ->
-            PostSummaryResponse(
-                author = userInfo.name,
-                time = post.time,
-                title = post.title,
-                gratuity = post.gratuity,
-                place = post.place,
-                thumbnail = null,
-                id = post.id,
-            )
-        }
+        return postRepository.findSummarizedPostsByUserId(userId)
     }
 
     @Transactional(readOnly = true)

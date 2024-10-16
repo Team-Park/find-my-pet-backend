@@ -27,6 +27,8 @@ interface PostQueryRepository {
     fun findPostDetailWithImages(postId: UUID): PostDetailResponse?
 
     fun findSummarizedPostsByPage(size: Long, offset: Long, orderBy: OrderBy): SummarizedPostsByPageDto
+
+    fun findSummarizedPostsByUserId(userId: UUID): List<PostSummaryResponse>
 }
 
 class PostQueryRepositoryImpl(
@@ -115,6 +117,30 @@ class PostQueryRepositoryImpl(
             totalCount = totalCount,
             result = result,
         )
+    }
+
+    override fun findSummarizedPostsByUserId(userId: UUID): List<PostSummaryResponse> {
+        return jpaQueryFactory
+            .select(
+                Projections.constructor(
+                    PostSummaryResponse::class.java,
+                    post.id,
+                    userInfo.name,
+                    post.title,
+                    post.gratuity,
+                    post.place,
+                    post.time,
+                    JPAExpressions.select(postImage.imageUrl)
+                        .from(postImage)
+                        .where(postImage.post.id.eq(post.id))
+                        .orderBy(postImage.id.asc())
+                        .limit(1),
+                ),
+            )
+            .from(post)
+            .where(post.author.eq(userId))
+            .leftJoin(userInfo).on(userInfo.user.id.eq(userId))
+            .fetch()
     }
 
     private fun setOrderBy(orderBy: OrderBy): OrderSpecifier<*> = when (orderBy) {
