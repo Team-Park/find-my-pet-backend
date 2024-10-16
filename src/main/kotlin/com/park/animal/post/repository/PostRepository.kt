@@ -102,7 +102,6 @@ class PostQueryRepositoryImpl(
             .from(post)
             .leftJoin(user).on(post.author.eq(user.id))
             .leftJoin(userInfo).on(user.id.eq(userInfo.user.id))
-            .groupBy(post.id)
             .orderBy(setOrderBy(orderBy))
             .offset(offset)
             .limit(size)
