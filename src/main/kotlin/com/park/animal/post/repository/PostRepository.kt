@@ -99,12 +99,12 @@ class PostQueryRepositoryImpl(
             .from(post)
             .leftJoin(user).on(post.author.eq(user.id))
             .leftJoin(userInfo).on(user.id.eq(userInfo.user.id))
-            .leftJoin(postImage).on(postImage.post.id.eq(post.id))
-            .where(
-                postImage.createdAt.eq(getCreatedAtMinValueFromPostImage(post.id))
-                    .and(postImage.deletedAt.isNull)
-                    .and(post.deletedAt.isNull),
+            .leftJoin(postImage).on(
+                postImage.post.id.eq(post.id)
+                    .and(postImage.createdAt.eq(getCreatedAtMinValueFromPostImage(post.id)))
+                    .and(postImage.deletedAt.isNull),
             )
+            .where(post.deletedAt.isNull)
             .orderBy(setOrderBy(orderBy))
             .offset(offset)
             .limit(size)
