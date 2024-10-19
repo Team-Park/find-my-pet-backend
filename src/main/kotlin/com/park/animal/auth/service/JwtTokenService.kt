@@ -99,7 +99,7 @@ class JwtTokenService(
     }
 
     fun getUserIdByRefreshToken(refreshToken: String): UUID =
-        UUID.fromString(parseRefreshToken(refreshTokenSecretKeyString)[AuthConstants.USER_ID].toString())
+        UUID.fromString(parseRefreshToken(refreshToken)[AuthConstants.USER_ID].toString())
 
     companion object {
         fun minKeyStringLength(algorithm: SignatureAlgorithm) = algorithm.minKeyLength.let { (it + 5) / 6 }
