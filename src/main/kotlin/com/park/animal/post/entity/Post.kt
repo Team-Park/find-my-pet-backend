@@ -4,12 +4,18 @@ import com.park.animal.common.persistence.BaseEntity
 import com.park.animal.post.dto.RegisterPostCommand
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import org.hibernate.annotations.DynamicUpdate
 import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.annotations.SQLDelete
 import org.hibernate.type.SqlTypes
 import java.time.LocalDateTime
 import java.util.UUID
 
+const val POST_TABLE_NAME = "post"
+
 @Entity
+@DynamicUpdate
+@SQLDelete(sql = "UPDATE $POST_TABLE_NAME set deleted_at = now() WHERE id = ?")
 class Post(
     @JdbcTypeCode(SqlTypes.VARCHAR)
     val author: UUID,
