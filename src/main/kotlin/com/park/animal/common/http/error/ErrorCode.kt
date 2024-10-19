@@ -1,5 +1,6 @@
 package com.park.animal.common.http.error
 
+import com.park.animal.common.http.response.FailedApiResponseBody
 import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
 
@@ -27,3 +28,9 @@ enum class ErrorCode(
 
     UNKNOWN_ERROR("알 수 없는 에러", HttpStatus.INTERNAL_SERVER_ERROR),
 }
+
+fun ErrorCode.toFailedResponseBody(): FailedApiResponseBody =
+    FailedApiResponseBody(
+        code = this.name,
+        message = this.message,
+    )

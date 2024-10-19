@@ -42,7 +42,7 @@ fun HttpServletRequest.getBearerTokenFromHeader(): String {
                 BEARER_PREFIX.length,
             )
 
-            else -> throw NoBearerTokenException(ErrorCode.NO_BEARER_TOKEN)
+            else -> throw NoBearerTokenException(ErrorCode.NO_BEARER_TOKEN, null)
         }
-    } ?: throw NoBearerTokenException(ErrorCode.NO_BEARER_TOKEN)
+    } ?: throw NoBearerTokenException(ErrorCode.NO_BEARER_TOKEN, null)
 }

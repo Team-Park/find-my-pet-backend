@@ -78,9 +78,9 @@ class JwtTokenService(
                 .parseClaimsJws(token)
                 .body
         } catch (e: ExpiredJwtException) {
-            throw CustomExpiredJwtException(ErrorCode.EXPIRED_JWT)
+            throw CustomExpiredJwtException(ErrorCode.EXPIRED_JWT, e)
         } catch (e: JwtException) {
-            throw ParseJwtFailedException(ErrorCode.PARSE_JWT_FAILED)
+            throw ParseJwtFailedException(ErrorCode.PARSE_JWT_FAILED, e)
         }
     }
 
@@ -92,9 +92,9 @@ class JwtTokenService(
                 .parseClaimsJws(refreshToken)
                 .body
         } catch (e: ExpiredJwtException) {
-            throw CustomExpiredJwtException(ErrorCode.EXPIRED_JWT)
+            throw CustomExpiredJwtException(ErrorCode.EXPIRED_JWT, e)
         } catch (e: JwtException) {
-            throw ParseJwtFailedException(ErrorCode.PARSE_JWT_FAILED)
+            throw ParseJwtFailedException(ErrorCode.PARSE_JWT_FAILED, e)
         }
     }
 

@@ -35,6 +35,8 @@ class GlobalExceptionController {
                 errorMessage = ${e.errorCode.message}
                 exception message = ${e.message}
                 requestPath = ${request.requestURI}
+                cause = ${e.cause}
+                throwable message = ${e.cause?.message}
             """.trimIndent(),
         )
 
@@ -60,25 +62,16 @@ class GlobalExceptionController {
 }
 
 fun BusinessException.toFailedBody(): ResponseEntity<FailedApiResponseBody> {
-    val failedApiResponseBody = FailedApiResponseBody(
-        code = this.errorCode.name,
-        message = this.errorCode.message,
-    )
+    val failedApiResponseBody = this.errorCode.toFailedResponseBody()
     return ResponseEntity.status(this.errorCode.httpCode.value()).body(failedApiResponseBody)
 }
 
 fun AuthException.toFailedBody(): ResponseEntity<FailedApiResponseBody> {
-    val failedApiResponseBody = FailedApiResponseBody(
-        code = this.errorCode.name,
-        message = this.errorCode.message,
-    )
+    val failedApiResponseBody = this.errorCode.toFailedResponseBody()
     return ResponseEntity.status(this.errorCode.httpCode.value()).body(failedApiResponseBody)
 }
 
 fun Exception.toFailedBody(): ResponseEntity<FailedApiResponseBody> {
-    val failedApiResponseBody = FailedApiResponseBody(
-        code = ErrorCode.UNKNOWN_ERROR.name,
-        message = ErrorCode.UNKNOWN_ERROR.message,
-    )
+    val failedApiResponseBody = ErrorCode.UNKNOWN_ERROR.toFailedResponseBody()
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(failedApiResponseBody)
 }
