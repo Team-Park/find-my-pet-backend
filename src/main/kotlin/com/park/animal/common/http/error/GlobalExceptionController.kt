@@ -5,6 +5,8 @@ import com.park.animal.common.http.error.exception.BusinessException
 import com.park.animal.common.http.response.FailedApiResponseBody
 import com.park.animal.common.log.logger
 import jakarta.servlet.http.HttpServletRequest
+import org.hibernate.query.sqm.tree.SqmNode.log
+import org.springframework.boot.logging.LogLevel
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -16,30 +18,13 @@ class GlobalExceptionController {
 
     @ExceptionHandler(BusinessException::class)
     fun businessException(e: BusinessException, request: HttpServletRequest): ResponseEntity<FailedApiResponseBody> {
-        log.error(
-            """
-            error Code = ${e.errorCode},
-            error Message = ${e.errorCode.message}
-            exception message = ${e.message}
-            requestPath = ${request.requestURI}
-            """.trimIndent(),
-        )
+        outputLog(errorCode = e.errorCode, e = e, path = request.requestURI)
         return e.toFailedBody()
     }
 
     @ExceptionHandler(AuthException::class)
     fun authExceptions(e: AuthException, request: HttpServletRequest): ResponseEntity<FailedApiResponseBody> {
-        log.error(
-            """
-                errorCode = ${e.errorCode.name}
-                errorMessage = ${e.errorCode.message}
-                exception message = ${e.message}
-                requestPath = ${request.requestURI}
-                cause = ${e.cause}
-                throwable message = ${e.cause?.message}
-            """.trimIndent(),
-        )
-
+        outputLog(errorCode = e.errorCode, e = e, path = request.requestURI)
         return e.toFailedBody()
     }
 
@@ -48,16 +33,40 @@ class GlobalExceptionController {
         e: Exception,
         request: HttpServletRequest,
     ): ResponseEntity<FailedApiResponseBody> {
-        log.error(
-            """
-            errorCode = ${ErrorCode.UNKNOWN_ERROR}
-            message = ${ErrorCode.UNKNOWN_ERROR.message}
-            requestPath = ${request.requestURI}
-            stackTrace = ${e.printStackTrace()}
-            message = ${e.message}
-            """.trimIndent(),
-        )
+        outputLog(errorCode = ErrorCode.UNKNOWN_ERROR, e = e, path = request.requestURI)
         return e.toFailedBody()
+    }
+
+    private fun outputLog(errorCode: ErrorCode, e: Exception, path: String) {
+        when (errorCode.level) {
+            LogLevel.ERROR -> {
+                log.error(
+                    """
+            errorCode = ${errorCode.name}
+            message = ${errorCode.message}
+            requestPath = $path
+            stackTrace = ${e.cause?.printStackTrace()}
+            cause = ${e.cause}
+            message = ${e.message}
+                    """.trimIndent(),
+                )
+            }
+
+            LogLevel.WARN -> {
+                log.warn(
+                    """
+            errorCode = ${errorCode.name}
+            message = ${errorCode.message}
+            requestPath = $path
+            stackTrace = ${e.cause?.printStackTrace()}
+            cause = ${e.cause}
+            message = ${e.message}
+                    """.trimIndent(),
+                )
+            }
+
+            else -> {}
+        }
     }
 }
 
