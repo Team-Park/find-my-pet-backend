@@ -83,27 +83,7 @@ class PostQueryRepositoryImpl(
     }
 
     override fun findSummarizedPostsByPage(size: Long, offset: Long, orderBy: OrderBy): SummarizedPostsByPageDto {
-        val result = jpaQueryFactory
-            .select(
-                Projections.constructor(
-                    PostSummaryResponse::class.java,
-                    post.id,
-                    userInfo.name,
-                    post.title,
-                    post.gratuity,
-                    post.place,
-                    post.time,
-                    postImage.imageUrl,
-                ),
-            )
-            .from(post)
-            .leftJoin(user).on(post.author.eq(user.id))
-            .leftJoin(userInfo).on(user.id.eq(userInfo.user.id))
-            .leftJoin(postImage).on(
-                postImage.post.id.eq(post.id)
-                    .and(postImage.createdAt.eq(getCreatedAtMinValueFromPostImage(post.id)))
-                    .and(postImage.deletedAt.isNull),
-            )
+        val result = postSummaryWithThumbnail()
             .where(post.deletedAt.isNull)
             .orderBy(setOrderBy(orderBy))
             .offset(offset)
@@ -121,36 +101,39 @@ class PostQueryRepositoryImpl(
         )
     }
 
+    override fun findSummarizedPostsByUserId(userId: UUID): List<PostSummaryResponse> {
+        return postSummaryWithThumbnail()
+            .where(post.author.eq(userId))
+            .where(post.deletedAt.isNull.and(user.id.eq(userId)))
+            .fetch()
+    }
+
+    private fun postSummaryWithThumbnail() = jpaQueryFactory
+        .select(
+            Projections.constructor(
+                PostSummaryResponse::class.java,
+                post.id,
+                userInfo.name,
+                post.title,
+                post.gratuity,
+                post.place,
+                post.time,
+                postImage.imageUrl,
+            ),
+        )
+        .from(post)
+        .leftJoin(user).on(post.author.eq(user.id))
+        .leftJoin(userInfo).on(user.id.eq(userInfo.user.id))
+        .leftJoin(postImage).on(
+            postImage.post.id.eq(post.id)
+                .and(postImage.createdAt.eq(getCreatedAtMinValueFromPostImage(post.id)))
+                .and(postImage.deletedAt.isNull),
+        )
+
     private fun getCreatedAtMinValueFromPostImage(postId: ComparablePath<UUID>) =
         JPAExpressions.select(postImage.createdAt.min())
             .from(postImage)
             .where(postImage.post.id.eq(postId))
-
-    override fun findSummarizedPostsByUserId(userId: UUID): List<PostSummaryResponse> {
-        return jpaQueryFactory
-            .select(
-                Projections.constructor(
-                    PostSummaryResponse::class.java,
-                    post.id,
-                    userInfo.name,
-                    post.title,
-                    post.gratuity,
-                    post.place,
-                    post.time,
-                    postImage.imageUrl,
-                ),
-            )
-            .from(post)
-            .where(post.author.eq(userId))
-            .leftJoin(postImage).on(postImage.post.id.eq(post.id))
-            .where(
-                postImage.createdAt.eq(getCreatedAtMinValueFromPostImage(post.id))
-                    .and(postImage.deletedAt.isNull)
-                    .and(postImage.deletedAt.isNull),
-            )
-            .leftJoin(userInfo).on(userInfo.user.id.eq(userId))
-            .fetch()
-    }
 
     private fun setOrderBy(orderBy: OrderBy): OrderSpecifier<*> = when (orderBy) {
         OrderBy.UPDATED_AT_DESC -> OrderSpecifier(Order.DESC, post.updatedAt)

@@ -53,7 +53,8 @@ class GlobalExceptionController {
             errorCode = ${ErrorCode.UNKNOWN_ERROR}
             message = ${ErrorCode.UNKNOWN_ERROR.message}
             requestPath = ${request.requestURI}
-            stackTrace = ${e.printStackTrace()}
+            stackTrace = ${e.cause?.printStackTrace()}
+            cause = ${e.cause}
             message = ${e.message}
             """.trimIndent(),
         )
