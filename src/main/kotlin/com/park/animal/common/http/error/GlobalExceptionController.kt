@@ -5,6 +5,8 @@ import com.park.animal.common.http.error.exception.BusinessException
 import com.park.animal.common.http.response.FailedApiResponseBody
 import com.park.animal.common.log.logger
 import jakarta.servlet.http.HttpServletRequest
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
@@ -13,7 +15,7 @@ class GlobalExceptionController {
     private val log = logger()
 
     @ExceptionHandler(BusinessException::class)
-    fun businessException(e: BusinessException, request: HttpServletRequest): FailedApiResponseBody {
+    fun businessException(e: BusinessException, request: HttpServletRequest): ResponseEntity<FailedApiResponseBody> {
         log.error(
             """
             error Code = ${e.errorCode},
@@ -22,11 +24,11 @@ class GlobalExceptionController {
             requestPath = ${request.requestURI}
             """.trimIndent(),
         )
-        return FailedApiResponseBody(code = e.errorCode.name, message = e.errorCode.message)
+        return e.toFailedBody()
     }
 
     @ExceptionHandler(AuthException::class)
-    fun authExceptions(e: AuthException, request: HttpServletRequest): FailedApiResponseBody {
+    fun authExceptions(e: AuthException, request: HttpServletRequest): ResponseEntity<FailedApiResponseBody> {
         log.error(
             """
                 errorCode = ${e.errorCode.name}
@@ -35,22 +37,48 @@ class GlobalExceptionController {
                 requestPath = ${request.requestURI}
             """.trimIndent(),
         )
-        return FailedApiResponseBody(code = e.errorCode.name, message = e.errorCode.message)
+
+        return e.toFailedBody()
     }
 
     @ExceptionHandler(Exception::class)
     fun unKnownException(
         e: Exception,
         request: HttpServletRequest,
-    ): FailedApiResponseBody {
+    ): ResponseEntity<FailedApiResponseBody> {
         log.error(
             """
             errorCode = ${ErrorCode.UNKNOWN_ERROR}
             message = ${ErrorCode.UNKNOWN_ERROR.message}
             requestPath = ${request.requestURI}
             stackTrace = ${e.printStackTrace()}
+            message = ${e.message}
             """.trimIndent(),
         )
-        return FailedApiResponseBody(code = ErrorCode.UNKNOWN_ERROR.name, message = ErrorCode.UNKNOWN_ERROR.message)
+        return e.toFailedBody()
     }
+}
+
+fun BusinessException.toFailedBody(): ResponseEntity<FailedApiResponseBody> {
+    val failedApiResponseBody = FailedApiResponseBody(
+        code = this.errorCode.name,
+        message = this.errorCode.message,
+    )
+    return ResponseEntity.status(this.errorCode.httpCode.value()).body(failedApiResponseBody)
+}
+
+fun AuthException.toFailedBody(): ResponseEntity<FailedApiResponseBody> {
+    val failedApiResponseBody = FailedApiResponseBody(
+        code = this.errorCode.name,
+        message = this.errorCode.message,
+    )
+    return ResponseEntity.status(this.errorCode.httpCode.value()).body(failedApiResponseBody)
+}
+
+fun Exception.toFailedBody(): ResponseEntity<FailedApiResponseBody> {
+    val failedApiResponseBody = FailedApiResponseBody(
+        code = ErrorCode.UNKNOWN_ERROR.name,
+        message = ErrorCode.UNKNOWN_ERROR.message,
+    )
+    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(failedApiResponseBody)
 }

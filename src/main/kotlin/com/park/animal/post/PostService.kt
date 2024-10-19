@@ -78,7 +78,7 @@ class PostService(
         val post = getPostEntity(postId)
 
         if (post.author != userId) {
-            throw BusinessException(ErrorCode.UNAUTHORIZED)
+            throw BusinessException(ErrorCode.FORBIDDEN)
         }
         postRepository.delete(post)
     }
@@ -87,7 +87,7 @@ class PostService(
     fun updatePost(command: UpdatePostRequest, userId: UUID) {
         val post = getPostEntity(command.postId)
         if (post.author != userId) {
-            throw BusinessException(ErrorCode.UNAUTHORIZED)
+            throw BusinessException(ErrorCode.FORBIDDEN)
         }
         post.update(
             title = command.title,
@@ -106,7 +106,7 @@ class PostService(
     fun addPostImage(images: List<MultipartFile>, postId: UUID, userId: UUID) {
         val postEntity = getPostEntity(postId)
         if (postEntity.author != userId) {
-            throw BusinessException(ErrorCode.UNAUTHORIZED)
+            throw BusinessException(ErrorCode.FORBIDDEN)
         }
         runBlocking {
             val uploadImages = uploadImages(images)
@@ -118,7 +118,7 @@ class PostService(
     fun deletePostImage(userId: UUID, postImageId: UUID, postId: UUID) {
         val post = getPostEntity(postId)
         if (post.author != userId) {
-            throw BusinessException(ErrorCode.UNAUTHORIZED)
+            throw BusinessException(ErrorCode.FORBIDDEN)
         }
         val postImageEntity = getPostImageEntity(postImageId)
         postImageRepository.delete(postImageEntity)
