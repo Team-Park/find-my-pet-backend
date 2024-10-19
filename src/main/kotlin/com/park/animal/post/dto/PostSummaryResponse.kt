@@ -7,6 +7,7 @@ data class PostSummaryResponse(
     val id: UUID,
     val author: String,
     val title: String,
+    val description: String,
     val gratuity: Int,
     val place: String,
     val time: LocalDateTime,

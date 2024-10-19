@@ -92,6 +92,7 @@ class PostQueryRepositoryImpl(
 
         val totalCount: Long = jpaQueryFactory.select(post.count())
             .from(post)
+            .where(post.deletedAt.isNull)
             .fetchOne() ?: 0L
 
         return SummarizedPostsByPageDto(
@@ -115,6 +116,7 @@ class PostQueryRepositoryImpl(
                 post.id,
                 userInfo.name,
                 post.title,
+                post.description,
                 post.gratuity,
                 post.place,
                 post.time,
