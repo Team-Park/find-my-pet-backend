@@ -116,6 +116,7 @@ class PostQueryRepositoryImpl(
                 post.id,
                 userInfo.name,
                 post.title,
+                post.description,
                 post.gratuity,
                 post.place,
                 post.time,
