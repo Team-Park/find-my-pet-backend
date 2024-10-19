@@ -44,7 +44,7 @@ class GlobalExceptionController {
     }
 
     @ExceptionHandler(Exception::class)
-    fun unKnownException(
+    fun unknownException(
         e: Exception,
         request: HttpServletRequest,
     ): ResponseEntity<FailedApiResponseBody> {
