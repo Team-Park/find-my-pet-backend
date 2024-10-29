@@ -27,7 +27,7 @@ interface PostRepository : JpaRepository<Post, UUID>, PostQueryRepository {
 interface PostQueryRepository {
     fun findPostDetailWithImages(postId: UUID): PostDetailResponse?
 
-    fun findSummarizedPostsByPage(size: Long, offset: Long, orderBy: OrderBy): SummarizedPostsByPageDto
+    fun findSummarizedPostsByPage(size: Long, page: Long, orderBy: OrderBy): SummarizedPostsByPageDto
 
     fun findSummarizedPostsByUserId(userId: UUID): List<PostSummaryResponse>
 }
@@ -82,7 +82,8 @@ class PostQueryRepositoryImpl(
             .fetch()
     }
 
-    override fun findSummarizedPostsByPage(size: Long, offset: Long, orderBy: OrderBy): SummarizedPostsByPageDto {
+    override fun findSummarizedPostsByPage(size: Long, page: Long, orderBy: OrderBy): SummarizedPostsByPageDto {
+        val offset = page * size
         val result = postSummaryWithThumbnail()
             .where(post.deletedAt.isNull)
             .orderBy(setOrderBy(orderBy))
@@ -96,7 +97,7 @@ class PostQueryRepositoryImpl(
             .fetchOne() ?: 0L
 
         return SummarizedPostsByPageDto(
-            hasNextPage = result.size > size,
+            hasNextPage = totalCount > (size * (page + 1)),
             totalCount = totalCount,
             result = result,
         )
@@ -140,5 +141,6 @@ class PostQueryRepositoryImpl(
     private fun setOrderBy(orderBy: OrderBy): OrderSpecifier<*> = when (orderBy) {
         OrderBy.UPDATED_AT_DESC -> OrderSpecifier(Order.DESC, post.updatedAt)
         OrderBy.CREATED_AT_DESC -> OrderSpecifier(Order.DESC, post.createdAt)
+        OrderBy.CREATED_AT_ASC -> OrderSpecifier(Order.ASC, post.createdAt)
     }
 }

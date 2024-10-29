@@ -69,7 +69,7 @@ class PostService(
         return postRepository.findSummarizedPostsByPage(
             size = query.size,
             orderBy = query.orderBy,
-            offset = query.offset,
+            page = query.offset,
         )
     }
 
