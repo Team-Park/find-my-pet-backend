@@ -33,6 +33,7 @@ class WebMvcConfig(
                 "https://localhost:[*]",
                 "https://find-my-pet-frontend.vercel.app",
                 "https://findmypet.site",
+                "https://www.findmypet.site",
             )
             .allowedHeaders("*")
             .allowedMethods("*")

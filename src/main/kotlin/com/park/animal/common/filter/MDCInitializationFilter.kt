@@ -11,6 +11,15 @@ import java.util.UUID
 class MDCInitializationFilter : Filter {
     override fun doFilter(request: ServletRequest?, response: ServletResponse?, chain: FilterChain?) {
         val httpRequest = request as HttpServletRequest
+        initializeMdcContext(httpRequest)
+        try {
+            chain!!.doFilter(request, response)
+        } finally {
+            clearMdcContext()
+        }
+    }
+
+    private fun initializeMdcContext(httpRequest: HttpServletRequest) {
         var traceId = httpRequest.getHeader("X-Request-ID")
 
         if (traceId == null || traceId.isEmpty()) {
@@ -19,13 +28,12 @@ class MDCInitializationFilter : Filter {
 
         MDC.put("X-Request-ID", traceId)
         MDC.put("method", httpRequest.method)
-        MDC.put("path", request.requestURI)
-        try {
-            chain!!.doFilter(request, response)
-        } finally {
-            MDC.remove("X-Request-ID")
-            MDC.remove("method")
-            MDC.remove("path")
-        }
+        MDC.put("path", httpRequest.requestURI)
+    }
+
+    private fun clearMdcContext() {
+        MDC.remove("X-Request-ID")
+        MDC.remove("method")
+        MDC.remove("path")
     }
 }
