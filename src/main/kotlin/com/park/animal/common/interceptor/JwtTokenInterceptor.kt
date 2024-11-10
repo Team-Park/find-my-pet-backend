@@ -23,8 +23,8 @@ class JwtTokenInterceptor(
             return true
         }
         val handlerMethod = handler as? HandlerMethod
-        val publicAnnotation = handlerMethod?.getMethodAnnotation(PublicEndPoint::class.java)
-        if (publicAnnotation != null) {
+        val isPublicRequest = isPublicRequest(handlerMethod)
+        if (isPublicRequest) {
             return true
         }
         val token = request.getBearerTokenFromHeader()
@@ -32,6 +32,10 @@ class JwtTokenInterceptor(
         request.setAttribute(AuthConstants.USER_ID, claim[AuthConstants.USER_ID])
         request.setAttribute(AuthConstants.USER_ROLE, claim[AuthConstants.USER_ROLE])
         return true
+    }
+
+    private fun isPublicRequest(handlerMethod: HandlerMethod?): Boolean {
+        return handlerMethod?.hasMethodAnnotation(PublicEndPoint::class.java) ?: false
     }
 }
 
