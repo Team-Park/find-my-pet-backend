@@ -37,6 +37,7 @@ abstract class AbstractSocialLoginHandler(
             tokenResponse.refreshTokenExpiresIn,
         )
         return SignInResponse(
+            id = user.id,
             accessToken = tokenResponse.accessToken,
             refreshToken = tokenResponse.refreshToken,
             accessTokenExpiresIn = tokenResponse.accessTokenExpiresIn,
