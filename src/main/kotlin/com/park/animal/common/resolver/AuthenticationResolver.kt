@@ -50,7 +50,8 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
 
 data class UserContext(
     val userId: UUID?,
-    val role: Role,
+    val role: Role?,
 ) {
     fun getIdIfRequired() = userId!!
+    fun getRoleIfRequired() = role!!
 }
