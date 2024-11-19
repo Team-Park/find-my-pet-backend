@@ -61,7 +61,7 @@ class PostService(
     }
 
     @Transactional(readOnly = true)
-    fun findDetailPost(id: UUID): PostDetailResponse = postRepository.findPostDetailWithImages(id)
+    fun findDetailPost(id: UUID, userId: UUID?): PostDetailResponse = postRepository.findPostDetailWithImages(id, userId)
         ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
 
     @Transactional(readOnly = true)

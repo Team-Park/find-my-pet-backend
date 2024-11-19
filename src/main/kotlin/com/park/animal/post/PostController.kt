@@ -62,8 +62,12 @@ class PostController(
 
     @GetMapping("/post/{id}")
     @PublicEndPoint
-    fun getPost(@PathVariable id: UUID): SucceededApiResponseBody<PostDetailResponse> {
-        val response = postService.findDetailPost(id)
+    fun getPost(
+        @PathVariable id: UUID,
+        @AuthenticationUser(isRequired = false)
+        userContext: UserContext?,
+    ): SucceededApiResponseBody<PostDetailResponse> {
+        val response = postService.findDetailPost(id, userContext?.userId)
         return SucceededApiResponseBody(data = response)
     }
 
