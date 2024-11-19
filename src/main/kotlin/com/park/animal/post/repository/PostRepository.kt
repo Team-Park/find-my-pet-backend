@@ -63,7 +63,11 @@ class PostQueryRepositoryImpl(
                     post.lng,
                 ),
                 CaseBuilder()
-                    .`when`(post.author.eq(userId)).then(true)
+                    .`when`(
+                        userId?.let {
+                            post.author.eq(it)
+                        } ?: post.author.isNull,
+                    ).then(true)
                     .otherwise(false),
             ),
         )
