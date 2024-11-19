@@ -65,6 +65,7 @@ class PostController(
     fun getPost(
         @PathVariable id: UUID,
         @AuthenticationUser(isRequired = false)
+        @Parameter(hidden = true)
         userContext: UserContext?,
     ): SucceededApiResponseBody<PostDetailResponse> {
         val response = postService.findDetailPost(id, userContext?.userId)
@@ -95,7 +96,7 @@ class PostController(
     ): SucceededApiResponseBody<Void> {
         postService.registerPost(
             RegisterPostCommand(
-                userId = userContext.userId,
+                userId = userContext.userId!!,
                 images = image,
                 title = title,
                 phoneNum = phoneNum,
@@ -123,7 +124,7 @@ class PostController(
         @RequestBody
         request: UpdatePostRequest,
     ): SucceededApiResponseBody<Void> {
-        postService.updatePost(command = request, userId = userContext.userId)
+        postService.updatePost(command = request, userId = userContext.getIdIfRequired())
         return SucceededApiResponseBody(data = null)
     }
 
@@ -142,7 +143,7 @@ class PostController(
         postService.addPostImage(
             images = image,
             postId = postId,
-            userId = userContext.userId,
+            userId = userContext.getIdIfRequired(),
         )
         return SucceededApiResponseBody(data = null)
     }
@@ -160,7 +161,7 @@ class PostController(
         request: DeletePostImageRequest,
     ): SucceededApiResponseBody<Void> {
         postService.deletePostImage(
-            userId = userContext.userId,
+            userId = userContext.getIdIfRequired(),
             postId = request.postId,
             postImageId = request.postImageId,
         )
@@ -178,7 +179,7 @@ class PostController(
         userContext: UserContext,
         @PathVariable id: UUID,
     ): SucceededApiResponseBody<Void> {
-        postService.deletePost(postId = id, userId = userContext.userId)
+        postService.deletePost(postId = id, userId = userContext.getIdIfRequired())
         return SucceededApiResponseBody(data = null)
     }
 }

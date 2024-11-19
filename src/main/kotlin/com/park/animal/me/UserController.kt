@@ -29,7 +29,7 @@ class UserController(
         @AuthenticationUser
         userContext: UserContext,
     ): SucceededApiResponseBody<List<PostSummaryResponse>> {
-        val response = userService.myPage(userId = userContext.userId)
+        val response = userService.myPage(userId = userContext.getIdIfRequired())
         return SucceededApiResponseBody(data = response)
     }
 }
