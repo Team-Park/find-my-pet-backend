@@ -17,7 +17,7 @@ import java.util.*
 @Component
 class AuthenticationResolver : HandlerMethodArgumentResolver {
     override fun supportsParameter(parameter: MethodParameter): Boolean {
-        return parameter.hasParameterAnnotation(AuthenticationUser::class.java)
+        return shouldAuthenticate(parameter)
     }
 
     override fun resolveArgument(
@@ -27,16 +27,25 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
         binderFactory: WebDataBinderFactory?,
     ): Any {
         webRequest.getNativeRequest(HttpServletRequest::class.java)?.let {
-            val userId = UUID.fromString(it.getAttribute(AuthConstants.USER_ID).toString())
-                ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
-            val role: Role = Role.valueOf(it.getAttribute(AuthConstants.USER_ROLE).toString()) as? Role
-                ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
-            return UserContext(
-                userId = userId,
-                role = role,
-            )
+            if (shouldAuthenticate(parameter)) {
+                val userId = UUID.fromString(it.getAttribute(AuthConstants.USER_ID).toString())
+                    ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
+                val role: Role = Role.valueOf(it.getAttribute(AuthConstants.USER_ROLE).toString()) as? Role
+                    ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
+                return UserContext(
+                    userId = userId,
+                    role = role,
+                )
+            } else {
+                return ""
+            }
         }
         throw BusinessException(ErrorCode.NOT_FOUND_REQUEST)
+    }
+
+    private fun shouldAuthenticate(parameter: MethodParameter): Boolean {
+        val authenticationUser = parameter.getParameterAnnotation(AuthenticationUser::class.java)
+        return authenticationUser?.isRequired ?: false
     }
 }
 

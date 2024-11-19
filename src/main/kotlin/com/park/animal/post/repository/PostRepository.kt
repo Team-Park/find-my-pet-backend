@@ -14,18 +14,19 @@ import com.park.animal.post.entity.QPostImage.postImage
 import com.querydsl.core.types.Order
 import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.core.types.Projections
+import com.querydsl.core.types.dsl.CaseBuilder
 import com.querydsl.core.types.dsl.ComparablePath
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.jpa.repository.JpaRepository
-import java.util.UUID
+import java.util.*
 
 interface PostRepository : JpaRepository<Post, UUID>, PostQueryRepository {
     fun findByAuthor(userId: UUID): List<Post>
 }
 
 interface PostQueryRepository {
-    fun findPostDetailWithImages(postId: UUID): PostDetailResponse?
+    fun findPostDetailWithImages(postId: UUID, userId: UUID?): PostDetailResponse?
 
     fun findSummarizedPostsByPage(size: Long, page: Long, orderBy: OrderBy): SummarizedPostsByPageDto
 
@@ -35,8 +36,8 @@ interface PostQueryRepository {
 class PostQueryRepositoryImpl(
     private val jpaQueryFactory: JPAQueryFactory,
 ) : PostQueryRepository {
-    override fun findPostDetailWithImages(postId: UUID): PostDetailResponse? {
-        val postDetail = findPostDetail(postId)
+    override fun findPostDetailWithImages(postId: UUID, userId: UUID?): PostDetailResponse? {
+        val postDetail = findPostDetail(postId, userId)
         val postImages = findPostImages(postId)
 
         return postDetail?.apply {
@@ -44,7 +45,7 @@ class PostQueryRepositoryImpl(
         }
     }
 
-    private fun findPostDetail(postId: UUID): PostDetailResponse? {
+    private fun findPostDetail(postId: UUID, userId: UUID?): PostDetailResponse? {
         return jpaQueryFactory.select(
             Projections.constructor(
                 PostDetailResponse::class.java,
@@ -61,6 +62,9 @@ class PostQueryRepositoryImpl(
                     post.lat,
                     post.lng,
                 ),
+                CaseBuilder()
+                    .`when`(post.author.eq(userId)).then(true)
+                    .otherwise(false),
             ),
         )
             .from(post)
