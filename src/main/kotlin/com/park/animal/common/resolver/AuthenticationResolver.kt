@@ -25,22 +25,21 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
         mavContainer: ModelAndViewContainer?,
         webRequest: NativeWebRequest,
         binderFactory: WebDataBinderFactory?,
-    ): Any {
-        webRequest.getNativeRequest(HttpServletRequest::class.java)?.let {
-            if (shouldAuthenticate(parameter)) {
-                val userId = UUID.fromString(it.getAttribute(AuthConstants.USER_ID).toString())
-                    ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
-                val role: Role = Role.valueOf(it.getAttribute(AuthConstants.USER_ROLE).toString()) as? Role
-                    ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
-                return UserContext(
-                    userId = userId,
-                    role = role,
-                )
-            } else {
-                return ""
-            }
+    ): Any? {
+        val request = webRequest.getNativeRequest(HttpServletRequest::class.java)
+            ?: throw BusinessException(ErrorCode.NOT_FOUND_REQUEST)
+        return if (shouldAuthenticate(parameter)) {
+            val userId = UUID.fromString(request.getAttribute(AuthConstants.USER_ID).toString())
+                ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
+            val role: Role = Role.valueOf(request.getAttribute(AuthConstants.USER_ROLE).toString()) as? Role
+                ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
+            UserContext(
+                userId = userId,
+                role = role,
+            )
+        } else {
+            null
         }
-        throw BusinessException(ErrorCode.NOT_FOUND_REQUEST)
     }
 
     private fun shouldAuthenticate(parameter: MethodParameter): Boolean {
