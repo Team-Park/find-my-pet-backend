@@ -28,8 +28,9 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
     ): Any? {
         val request = webRequest.getNativeRequest(HttpServletRequest::class.java)
             ?: throw BusinessException(ErrorCode.NOT_FOUND_REQUEST)
-        return if (shouldAuthenticate(parameter)) {
-            val userId = UUID.fromString(request.getAttribute(AuthConstants.USER_ID).toString())
+        val userIdAttribute = request.getAttribute(AuthConstants.USER_ID)
+        return if (shouldAuthenticate(parameter) || userIdAttribute != null) {
+            val userId = UUID.fromString(userIdAttribute.toString())
                 ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
             val role: Role = Role.valueOf(request.getAttribute(AuthConstants.USER_ROLE).toString()) as? Role
                 ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
@@ -44,7 +45,7 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
 
     private fun shouldAuthenticate(parameter: MethodParameter): Boolean {
         val authenticationUser = parameter.getParameterAnnotation(AuthenticationUser::class.java)
-        return authenticationUser?.isRequired ?: false
+        return authenticationUser?.isRequired?: false
     }
 }
 
