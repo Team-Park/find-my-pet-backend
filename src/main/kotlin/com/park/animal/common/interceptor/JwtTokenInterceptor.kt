@@ -24,27 +24,21 @@ class JwtTokenInterceptor(
             return true
         }
         val handlerMethod = handler as? HandlerMethod
-        val (isPublicRequest, token) = initializeTokenIfNeeded(handlerMethod, request)
-        if (isPublicRequest) {
-            logger().info("isPublic")
-            return true
-        }
-        val claim = jwtTokenService.parseAccessToken(token)
-        request.setAttribute(AuthConstants.USER_ID, claim[AuthConstants.USER_ID])
-        request.setAttribute(AuthConstants.USER_ROLE, claim[AuthConstants.USER_ROLE])
-        return true
+        return initializeTokenIfNeeded(request, handlerMethod)
     }
 
     private fun initializeTokenIfNeeded(
-        handlerMethod: HandlerMethod?,
         request: HttpServletRequest,
-    ): Pair<Boolean, String> {
+        handlerMethod: HandlerMethod?,
+    ): Boolean {
         return runCatching {
             val token = request.getBearerTokenFromHeader()
-            Pair(false, token)
+            val claim = jwtTokenService.parseAccessToken(token)
+            request.setAttribute(AuthConstants.USER_ID, claim[AuthConstants.USER_ID])
+            request.setAttribute(AuthConstants.USER_ROLE, claim[AuthConstants.USER_ROLE])
+            true
         }.getOrElse {
-            val hasAnnotation = handlerMethod?.hasMethodAnnotation(PublicEndPoint::class.java) ?: false
-            Pair(hasAnnotation, "")
+            return handlerMethod?.hasMethodAnnotation(PublicEndPoint::class.java) ?: false
         }
     }
 }

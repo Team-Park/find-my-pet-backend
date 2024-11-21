@@ -31,7 +31,7 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
             ?: throw BusinessException(ErrorCode.NOT_FOUND_REQUEST)
         val userIdAttribute = request.getAttribute(AuthConstants.USER_ID)
         return if (shouldAuthenticate(parameter) || userIdAttribute != null) {
-            logger().info("is userIdAttribute ${userIdAttribute.toString()}")
+            logger().info("is userIdAttribute ${userIdAttribute?.toString()}")
             val userId = UUID.fromString(userIdAttribute.toString())
                 ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
             val role: Role = Role.valueOf(request.getAttribute(AuthConstants.USER_ROLE).toString()) as? Role
@@ -41,6 +41,7 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
                 role = role,
             )
         } else {
+            logger().info("else authenticated")
             null
         }
     }
