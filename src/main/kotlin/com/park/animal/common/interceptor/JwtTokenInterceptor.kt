@@ -7,6 +7,7 @@ import com.park.animal.common.constants.AuthConstants.AUTHORIZATION_HEADER
 import com.park.animal.common.constants.AuthConstants.BEARER_PREFIX
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.NoBearerTokenException
+import com.park.animal.common.log.logger
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpMethod
@@ -25,6 +26,7 @@ class JwtTokenInterceptor(
         val handlerMethod = handler as? HandlerMethod
         val (isPublicRequest, token) = initializeTokenIfNeeded(handlerMethod, request)
         if (isPublicRequest) {
+            logger().info("isPublic")
             return true
         }
         val claim = jwtTokenService.parseAccessToken(token)

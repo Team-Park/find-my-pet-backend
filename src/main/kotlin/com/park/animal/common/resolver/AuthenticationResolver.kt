@@ -5,6 +5,7 @@ import com.park.animal.common.annotation.AuthenticationUser
 import com.park.animal.common.constants.AuthConstants
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
+import com.park.animal.common.log.logger
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.core.MethodParameter
 import org.springframework.stereotype.Component
@@ -30,6 +31,7 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
             ?: throw BusinessException(ErrorCode.NOT_FOUND_REQUEST)
         val userIdAttribute = request.getAttribute(AuthConstants.USER_ID)
         return if (shouldAuthenticate(parameter) || userIdAttribute != null) {
+            logger().info("is userIdAttribute ${userIdAttribute.toString()}")
             val userId = UUID.fromString(userIdAttribute.toString())
                 ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
             val role: Role = Role.valueOf(request.getAttribute(AuthConstants.USER_ROLE).toString()) as? Role
@@ -45,7 +47,7 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
 
     private fun shouldAuthenticate(parameter: MethodParameter): Boolean {
         val authenticationUser = parameter.getParameterAnnotation(AuthenticationUser::class.java)
-        return authenticationUser?.isRequired?: false
+        return authenticationUser?.isRequired ?: false
     }
 }
 
