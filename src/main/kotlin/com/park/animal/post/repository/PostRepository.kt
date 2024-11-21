@@ -77,8 +77,8 @@ class PostQueryRepositoryImpl(
             userId?.let {
                 post.author.eq(it)
             } ?: Expressions.FALSE,
-        ).then(true)
-        .otherwise(false)
+        ).then(1)
+        .otherwise(0)
 
     private fun findPostImages(postId: UUID): List<PostImageResponse> {
         return jpaQueryFactory.select(
