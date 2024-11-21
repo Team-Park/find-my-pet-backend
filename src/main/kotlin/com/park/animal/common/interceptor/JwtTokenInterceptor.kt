@@ -38,7 +38,12 @@ class JwtTokenInterceptor(
             request.setAttribute(AuthConstants.USER_ROLE, claim[AuthConstants.USER_ROLE])
             true
         }.getOrElse {
-            return handlerMethod?.hasMethodAnnotation(PublicEndPoint::class.java) ?: false
+            val publicEndPoint = handlerMethod?.hasMethodAnnotation(PublicEndPoint::class.java) ?: false
+            if (publicEndPoint) {
+                true
+            } else {
+                throw it
+            }
         }
     }
 }
