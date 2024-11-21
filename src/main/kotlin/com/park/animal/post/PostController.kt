@@ -7,6 +7,7 @@ import com.park.animal.common.constants.OrderBy
 import com.park.animal.common.http.response.PaginatedApiResponseBody
 import com.park.animal.common.http.response.PaginatedApiResponseDto
 import com.park.animal.common.http.response.SucceededApiResponseBody
+import com.park.animal.common.log.logger
 import com.park.animal.common.resolver.UserContext
 import com.park.animal.post.dto.DeletePostImageRequest
 import com.park.animal.post.dto.PostDetailResponse
@@ -68,6 +69,7 @@ class PostController(
         @Parameter(hidden = true)
         userContext: UserContext?,
     ): SucceededApiResponseBody<PostDetailResponse> {
+        logger().info("user Id = ${userContext?.userId?.toString()}")
         val response = postService.findDetailPost(id, userContext?.userId)
         return SucceededApiResponseBody(data = response)
     }
