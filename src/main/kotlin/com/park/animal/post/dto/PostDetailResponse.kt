@@ -15,4 +15,27 @@ data class PostDetailResponse(
     var isMine: Boolean,
 ) {
     lateinit var imageUrls: List<PostImageResponse>
+    constructor(
+        name: String,
+        title: String,
+        phoneNum: String,
+        time: LocalDateTime,
+        place: String,
+        gender: String,
+        gratuity: Int,
+        description: String,
+        coordinate: Coordinate,
+        isMineInt: Int,
+    ) : this(
+        name,
+        title,
+        phoneNum,
+        time,
+        place,
+        gender,
+        gratuity,
+        description,
+        coordinate,
+        isMineInt == 1,
+    )
 }
