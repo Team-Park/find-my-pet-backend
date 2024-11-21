@@ -18,7 +18,7 @@ import java.util.*
 @Component
 class AuthenticationResolver : HandlerMethodArgumentResolver {
     override fun supportsParameter(parameter: MethodParameter): Boolean {
-        return shouldAuthenticate(parameter)
+        return true
     }
 
     override fun resolveArgument(
@@ -31,7 +31,6 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
             ?: throw BusinessException(ErrorCode.NOT_FOUND_REQUEST)
         val userIdAttribute = request.getAttribute(AuthConstants.USER_ID)
         return if (shouldAuthenticate(parameter) || userIdAttribute != null) {
-            logger().info("is userIdAttribute ${userIdAttribute?.toString()}")
             val userId = UUID.fromString(userIdAttribute.toString())
                 ?: throw BusinessException(ErrorCode.AUTHENTICATION_RESOLVER_ERROR)
             val role: Role = Role.valueOf(request.getAttribute(AuthConstants.USER_ROLE).toString()) as? Role
@@ -41,7 +40,6 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
                 role = role,
             )
         } else {
-            logger().info("else authenticated")
             null
         }
     }
