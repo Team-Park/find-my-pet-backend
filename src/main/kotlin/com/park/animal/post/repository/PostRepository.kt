@@ -16,6 +16,7 @@ import com.querydsl.core.types.OrderSpecifier
 import com.querydsl.core.types.Projections
 import com.querydsl.core.types.dsl.CaseBuilder
 import com.querydsl.core.types.dsl.ComparablePath
+import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.jpa.repository.JpaRepository
@@ -62,13 +63,7 @@ class PostQueryRepositoryImpl(
                     post.lat,
                     post.lng,
                 ),
-                CaseBuilder()
-                    .`when`(
-                        userId?.let {
-                            post.author.eq(it)
-                        } ?: post.author.isNull,
-                    ).then(true)
-                    .otherwise(false),
+                isMine(userId),
             ),
         )
             .from(post)
@@ -76,6 +71,14 @@ class PostQueryRepositoryImpl(
             .where(post.id.eq(postId))
             .fetchOne()
     }
+
+    private fun isMine(userId: UUID?) = CaseBuilder()
+        .`when`(
+            userId?.let {
+                post.author.eq(it)
+            } ?: Expressions.FALSE,
+        ).then(true)
+        .otherwise(false)
 
     private fun findPostImages(postId: UUID): List<PostImageResponse> {
         return jpaQueryFactory.select(
