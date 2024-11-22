@@ -12,9 +12,11 @@ data class PostDetailResponse(
     val gratuity: Int,
     val description: String,
     val coordinate: Coordinate,
+    val openChatUrl: String?,
     var isMine: Boolean,
 ) {
     lateinit var imageUrls: List<PostImageResponse>
+
     constructor(
         name: String,
         title: String,
@@ -25,6 +27,7 @@ data class PostDetailResponse(
         gratuity: Int,
         description: String,
         coordinate: Coordinate,
+        openChatUrl: String?,
         isMineInt: Int,
     ) : this(
         name,
@@ -36,6 +39,7 @@ data class PostDetailResponse(
         gratuity,
         description,
         coordinate,
+        openChatUrl,
         isMineInt == 1,
     )
 }

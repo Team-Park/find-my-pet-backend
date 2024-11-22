@@ -95,6 +95,7 @@ class PostController(
         @RequestParam(required = false) image: List<MultipartFile> = emptyList(),
         @RequestParam lat: Double,
         @RequestParam lng: Double,
+        @RequestParam openChatUrl: String?,
     ): SucceededApiResponseBody<Void> {
         postService.registerPost(
             RegisterPostCommand(
@@ -109,6 +110,7 @@ class PostController(
                 description = description,
                 lat = lat,
                 lng = lng,
+                openChatUrl = openChatUrl,
             ),
         )
         return SucceededApiResponseBody(data = null)

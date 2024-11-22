@@ -37,6 +37,8 @@ class Post(
     var lat: Double,
     @Column(name = "lng")
     var lng: Double,
+    @Column(name = "open_chat_url", nullable = true)
+    var openChatUrl: String?,
 ) : BaseEntity() {
     companion object {
         fun createPostFromCommand(command: RegisterPostCommand): Post {
@@ -51,6 +53,7 @@ class Post(
                 gratuity = command.gratuity,
                 lat = command.lat,
                 lng = command.lng,
+                openChatUrl = command.openChatUrl,
             )
         }
     }
@@ -65,6 +68,7 @@ class Post(
         description: String,
         lat: Double,
         lng: Double,
+        openChatUrl: String?,
     ) {
         this.gender = gender
         this.time = time
@@ -75,5 +79,6 @@ class Post(
         this.description = description
         this.lat = lat
         this.lng = lng
+        this.openChatUrl = openChatUrl
     }
 }

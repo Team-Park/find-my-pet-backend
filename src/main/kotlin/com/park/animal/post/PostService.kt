@@ -99,6 +99,7 @@ class PostService(
             gratuity = command.gratuity,
             lat = command.lat,
             lng = command.lng,
+            openChatUrl = command.openChatUrl,
         )
     }
 
