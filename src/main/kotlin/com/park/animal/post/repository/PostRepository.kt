@@ -63,6 +63,7 @@ class PostQueryRepositoryImpl(
                     post.lat,
                     post.lng,
                 ),
+                post.openChatUrl,
                 isMine(userId),
             ),
         )

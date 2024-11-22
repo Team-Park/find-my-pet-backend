@@ -16,4 +16,5 @@ data class RegisterPostCommand(
     val description: String,
     val lat: Double,
     val lng: Double,
+    val openChatUrl: String?,
 )
