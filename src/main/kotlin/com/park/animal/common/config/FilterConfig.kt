@@ -8,9 +8,10 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class FilterConfig {
     @Bean
-    fun requestResponseFilter(): FilterRegistrationBean<MDCInitializationFilter> = FilterRegistrationBean<MDCInitializationFilter>()
-        .apply {
-            this.filter = MDCInitializationFilter()
-            this.order = Int.MIN_VALUE
-        }
+    fun requestResponseFilter(): FilterRegistrationBean<MDCInitializationFilter> =
+        FilterRegistrationBean<MDCInitializationFilter>()
+            .apply {
+                this.filter = MDCInitializationFilter()
+                this.order = Int.MIN_VALUE
+            }
 }

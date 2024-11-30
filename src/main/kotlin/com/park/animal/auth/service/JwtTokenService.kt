@@ -1,9 +1,9 @@
 package com.park.animal.auth.service
 
-import com.park.animal.auth.dto.JwtResponseDto
 import com.park.animal.common.constants.AuthConstants
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.ParseJwtFailedException
+import dto.JwtResponseDto
 import io.jsonwebtoken.ExpiredJwtException
 import io.jsonwebtoken.Header
 import io.jsonwebtoken.JwtException

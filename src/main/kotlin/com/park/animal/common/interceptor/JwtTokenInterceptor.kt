@@ -1,13 +1,12 @@
 package com.park.animal.common.interceptor
 
+import annotation.PublicEndPoint
 import com.park.animal.auth.service.JwtTokenService
-import com.park.animal.common.annotation.PublicEndPoint
 import com.park.animal.common.constants.AuthConstants
 import com.park.animal.common.constants.AuthConstants.AUTHORIZATION_HEADER
 import com.park.animal.common.constants.AuthConstants.BEARER_PREFIX
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.NoBearerTokenException
-import com.park.animal.common.log.logger
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpMethod
