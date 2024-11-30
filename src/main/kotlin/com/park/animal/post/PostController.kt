@@ -1,20 +1,16 @@
 package com.park.animal.post
 
-import com.park.animal.common.annotation.AuthenticationUser
-import com.park.animal.common.annotation.PublicEndPoint
+import annotation.AuthenticationUser
+import annotation.PublicEndPoint
 import com.park.animal.common.config.SwaggerConfig
 import com.park.animal.common.constants.OrderBy
-import com.park.animal.common.http.response.PaginatedApiResponseBody
-import com.park.animal.common.http.response.PaginatedApiResponseDto
-import com.park.animal.common.http.response.SucceededApiResponseBody
-import com.park.animal.common.log.logger
-import com.park.animal.common.resolver.UserContext
 import com.park.animal.post.dto.DeletePostImageRequest
 import com.park.animal.post.dto.PostDetailResponse
 import com.park.animal.post.dto.PostSummaryResponse
 import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
 import com.park.animal.post.dto.UpdatePostRequest
+import dto.UserContext
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -28,6 +24,9 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
+import org.woo.http.PaginatedApiResponseBody
+import org.woo.http.PaginatedApiResponseDto
+import org.woo.http.SucceededApiResponseBody
 import java.time.LocalDateTime
 import java.util.*
 
@@ -69,7 +68,6 @@ class PostController(
         @Parameter(hidden = true)
         userContext: UserContext?,
     ): SucceededApiResponseBody<PostDetailResponse> {
-        logger().info("user Id = ${userContext?.userId?.toString()}")
         val response = postService.findDetailPost(id, userContext?.userId)
         return SucceededApiResponseBody(data = response)
     }

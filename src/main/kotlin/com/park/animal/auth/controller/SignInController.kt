@@ -1,17 +1,17 @@
 package com.park.animal.auth.controller
 
-import com.park.animal.auth.dto.JwtResponseDto
+import annotation.PublicEndPoint
 import com.park.animal.auth.dto.ReissueAccessTokenRequest
 import com.park.animal.auth.dto.SignInResponse
 import com.park.animal.auth.dto.SignInWithSocialRequest
 import com.park.animal.auth.service.SignInService
-import com.park.animal.common.annotation.PublicEndPoint
-import com.park.animal.common.http.response.SucceededApiResponseBody
+import dto.JwtResponseDto
 import io.swagger.v3.oas.annotations.Operation
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import org.woo.http.SucceededApiResponseBody
 
 @RestController
 @RequestMapping("/api/v1/auth")

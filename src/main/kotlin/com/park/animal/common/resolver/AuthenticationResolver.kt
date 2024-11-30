@@ -1,12 +1,12 @@
 package com.park.animal.common.resolver
 
-import com.park.animal.auth.entity.Role
-import com.park.animal.common.annotation.AuthenticationUser
+import annotation.AuthenticationUser
 import com.park.animal.common.constants.AuthConstants
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
-import com.park.animal.common.log.logger
+import dto.UserContext
 import jakarta.servlet.http.HttpServletRequest
+import model.Role
 import org.springframework.core.MethodParameter
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.support.WebDataBinderFactory
@@ -48,12 +48,4 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
         val authenticationUser = parameter.getParameterAnnotation(AuthenticationUser::class.java)
         return authenticationUser?.isRequired ?: false
     }
-}
-
-data class UserContext(
-    val userId: UUID?,
-    val role: Role?,
-) {
-    fun getIdIfRequired() = userId!!
-    fun getRoleIfRequired() = role!!
 }

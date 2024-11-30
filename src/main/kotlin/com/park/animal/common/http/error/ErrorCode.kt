@@ -1,11 +1,11 @@
 package com.park.animal.common.http.error
 
-import com.park.animal.common.http.response.FailedApiResponseBody
 import org.springframework.boot.logging.LogLevel
 import org.springframework.boot.logging.LogLevel.ERROR
 import org.springframework.boot.logging.LogLevel.WARN
 import org.springframework.http.HttpStatus
 import org.springframework.http.HttpStatusCode
+import org.woo.http.FailedApiResponseBody
 
 enum class ErrorCode(
     val message: String,

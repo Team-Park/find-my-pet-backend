@@ -1,6 +1,5 @@
 package com.park.animal.auth.service
 
-import com.park.animal.auth.dto.JwtResponseDto
 import com.park.animal.auth.dto.SignInResponse
 import com.park.animal.auth.dto.SignInWithSocialCommand
 import com.park.animal.auth.factory.SocialLoginFactory
@@ -8,6 +7,7 @@ import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
 import com.park.animal.redis.RedisConstant
 import com.park.animal.redis.RedisDriver
+import dto.JwtResponseDto
 import org.springframework.stereotype.Service
 
 @Service

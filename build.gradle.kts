@@ -21,9 +21,22 @@ java {
 
 repositories {
     mavenCentral()
+    maven {
+        name = "GitHubPackages"
+        url = uri("https://maven.pkg.github.com/PARKPARKWOO/common-module")
+        credentials {
+            username = project.findProperty("gpr.user")?.toString() ?: System.getenv("GITHUB_USERNAME")
+            password = project.findProperty("gpr.key")?.toString() ?: System.getenv("GITHUB_TOKEN")
+        }
+    }
 }
 
 dependencies {
+    implementation("org.woo:domain-auth:0.0.5-SNAPSHOT")
+    implementation("org.woo:http:+")
+    implementation("org.woo:mapper:+")
+    implementation("org.woo:log:+")
+
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")

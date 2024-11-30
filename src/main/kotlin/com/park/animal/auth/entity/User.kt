@@ -10,6 +10,7 @@ import jakarta.persistence.Embeddable
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
+import model.Role
 import org.hibernate.annotations.DynamicUpdate
 
 @Entity
@@ -36,11 +37,6 @@ class User(
         claims[AuthConstants.USER_ROLE] = role
         return claims
     }
-}
-
-enum class Role {
-    ROLE_USER,
-    ROLE_ADMIN,
 }
 
 @Embeddable

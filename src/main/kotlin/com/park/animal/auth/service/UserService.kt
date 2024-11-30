@@ -1,7 +1,6 @@
 package com.park.animal.auth.service
 
 import com.park.animal.auth.SocialLoginProvider
-import com.park.animal.auth.entity.Role
 import com.park.animal.auth.entity.SocialProvider
 import com.park.animal.auth.entity.User
 import com.park.animal.auth.entity.UserInfo
@@ -11,6 +10,7 @@ import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
 import com.park.animal.post.dto.PostSummaryResponse
 import com.park.animal.post.repository.PostRepository
+import model.Role
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.*

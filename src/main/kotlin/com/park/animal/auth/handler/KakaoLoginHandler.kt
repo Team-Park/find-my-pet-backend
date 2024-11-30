@@ -8,7 +8,6 @@ import com.park.animal.auth.external.KakaoOauthClient
 import com.park.animal.auth.service.JwtTokenService
 import com.park.animal.auth.service.UserService
 import com.park.animal.common.constants.AuthConstants
-import com.park.animal.common.log.logger
 import com.park.animal.redis.RedisDriver
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -45,8 +44,6 @@ class KakaoLoginHandler(
     override fun getUserInfoId(accessToken: String): UserInfoDto {
         val id = kakaoFeignClient.getTokenInfo(accessToken = AuthConstants.BEARER_PREFIX + accessToken).id.toString()
         val kakaoUserInfo = kakaoFeignClient.getKakaoUserInfo(accessToken = AuthConstants.BEARER_PREFIX + accessToken)
-        logger().info(kakaoUserInfo.toString())
-
         return UserInfoDto(
             socialId = id,
             name = kakaoUserInfo.kakaoAccount?.profile?.nickname ?: "임시닉네임${Random.nextInt()}",
