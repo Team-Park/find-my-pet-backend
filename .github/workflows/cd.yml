@@ -67,7 +67,7 @@ jobs:
 
       - name: Build with Gradle
         if: env.image_exists == 'false'
-        run: ./gradlew clean build -x test --refresh-dependencies --stacktrace
+        run: ./gradlew clean build -x test --refresh-dependencies --stacktrace -Pgpr.user=${{ github.actor }} -Pgpr.key=${{ secrets.GIT_PASSWORD }}
 
       - name: Build, tag, and push image to Docker Hub
         if: env.image_exists == 'false'

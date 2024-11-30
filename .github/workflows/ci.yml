@@ -38,7 +38,7 @@ jobs:
 
       #  To install packages associated with other private repositories that GITHUB_TOKEN can't access, use a personal access token (classic) with repository scope
       - name: Build and Test with Gradle
-        run: ./gradlew clean build --parallel -x test --refresh-dependencies --stacktrace
+        run: ./gradlew clean build -x test --refresh-dependencies --stacktrace -Pgpr.user=${{ github.actor }} -Pgpr.key=${{ secrets.GIT_PASSWORD }}
 
       - name: Cleanup Gradle Cache
         if: ${{ always() }}
