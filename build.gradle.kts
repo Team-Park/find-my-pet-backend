@@ -22,6 +22,8 @@ java {
 repositories {
     mavenCentral()
     maven {
+        println("user name = " + project.findProperty("gpr.user"))
+        println("key = ${project.findProperty("gpr.key").toString().substring(0, 6)}")
         name = "GitHubPackages"
         url = uri("https://maven.pkg.github.com/PARKPARKWOO/common-module")
         credentials {
