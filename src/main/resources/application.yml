@@ -52,7 +52,7 @@ jwt:
     expire-millis: ${REFRESH_EXPIRE_MILLIS}
 
 auth:
-  host: ${AUTH_HOST}
+  discovery-host: 'discovery:///${spring.profiles.active}-${AUTH_HOST}'
   grant-type: authorization_code
   kakao:
     client-id: ${FMP_KAKAO_CLIENT_ID}
@@ -68,3 +68,10 @@ aws:
 
 cloud-front:
   domain: ${CLOUD_FRONT_DOMAIN_NAME}
+grpc:
+  client:
+    auth:
+      address: ${auth.discovery-host}
+      enableKeepAlive: true
+      keepAliveWithoutCalls: true
+      negotiationType: plaintext
