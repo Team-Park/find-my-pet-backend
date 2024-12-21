@@ -31,3 +31,6 @@ jwt:
   refresh-token:
     secret-key: ${REFRESH_SECRET_KEY:asasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasaasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasaasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasa}
     expire-millis: ${REFRESH_EXPIRE_MILLIS:1000000000000000}
+
+server:
+  port: 8081

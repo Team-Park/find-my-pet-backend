@@ -4,6 +4,7 @@ import annotation.PublicEndPoint
 import com.park.animal.auth.dto.ReissueAccessTokenRequest
 import com.park.animal.auth.dto.SignInResponse
 import com.park.animal.auth.dto.SignInWithSocialRequest
+import com.park.animal.auth.external.AuthGrpcService
 import com.park.animal.auth.service.SignInService
 import dto.JwtResponseDto
 import io.swagger.v3.oas.annotations.Operation
@@ -17,6 +18,7 @@ import org.woo.http.SucceededApiResponseBody
 @RequestMapping("/api/v1/auth")
 class SignInController(
     private val signInService: SignInService,
+    val authGrpcService: AuthGrpcService,
 ) {
     @PostMapping("/sign-in/kakao")
     @PublicEndPoint
@@ -28,7 +30,9 @@ class SignInController(
             소셜로그인과는 무관합니다.
         """,
     )
-    fun kakaoLogin(@RequestBody request: SignInWithSocialRequest): SucceededApiResponseBody<SignInResponse> {
+    fun kakaoLogin(
+        @RequestBody request: SignInWithSocialRequest,
+    ): SucceededApiResponseBody<SignInResponse> {
         val response = signInService.signInWithSocial(request.toKaKaoCommand())
         return SucceededApiResponseBody(data = response)
     }
@@ -43,7 +47,9 @@ class SignInController(
             소셜로그인과는 무관합니다.
         """,
     )
-    fun signInWithGoogle(@RequestBody request: SignInWithSocialRequest): SucceededApiResponseBody<SignInResponse> {
+    fun signInWithGoogle(
+        @RequestBody request: SignInWithSocialRequest,
+    ): SucceededApiResponseBody<SignInResponse> {
         val response = signInService.signInWithSocial(request.toGoogleCommand())
         return SucceededApiResponseBody(data = response)
     }
@@ -63,5 +69,11 @@ class SignInController(
     ): SucceededApiResponseBody<JwtResponseDto> {
         val response = signInService.reissueToken(request.refreshToken)
         return SucceededApiResponseBody(data = response)
+    }
+
+    @PublicEndPoint
+    @PostMapping("/test")
+    suspend fun test() {
+        authGrpcService.getUserInfo("ddddddddddd")
     }
 }

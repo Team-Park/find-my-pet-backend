@@ -5,6 +5,7 @@ plugins {
     id("io.spring.dependency-management") version "1.1.6"
     kotlin("plugin.jpa") version "1.9.25"
     kotlin("kapt") version "1.9.25"
+    id("com.google.protobuf") version "0.9.4"
 }
 
 apply(plugin = "org.jetbrains.kotlin.plugin.jpa")
@@ -12,7 +13,7 @@ apply(plugin = "org.jetbrains.kotlin.plugin.spring")
 
 group = "com.park"
 version = "0.0.1-SNAPSHOT"
-
+val grpcVersion = "1.63.0"
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
@@ -22,8 +23,6 @@ java {
 repositories {
     mavenCentral()
     maven {
-        println("user name = " + project.findProperty("gpr.user"))
-        println("key = ${project.findProperty("gpr.key").toString().substring(0, 6)}")
         name = "GitHubPackages"
         url = uri("https://maven.pkg.github.com/PARKPARKWOO/common-module")
         credentials {
@@ -34,11 +33,12 @@ repositories {
 }
 
 dependencies {
-    implementation("org.woo:domain-auth:0.0.5-SNAPSHOT")
+    implementation("org.woo:domain-auth:0.0.6-SNAPSHOT")
     implementation("org.woo:http:+")
     implementation("org.woo:mapper:+")
     implementation("org.woo:log:+")
 
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
@@ -94,6 +94,17 @@ dependencies {
 
     // log-loki
     implementation("com.github.loki4j:loki-logback-appender:1.5.1")
+
+    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
+
+    // grpc
+    implementation("net.devh:grpc-client-spring-boot-starter:3.1.0.RELEASE") {
+        exclude(group = "io.grpc", module = "grpc-netty-shaded")
+        exclude(group = "io.grpc", module = "grpc-protobuf")
+//        exclude(group = "io.grpc", module = "grpc-")
+    }
+    implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
+    implementation("org.woo:grpc:0.0.6-SNAPSHOT")
 }
 
 kotlin {
