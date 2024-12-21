@@ -29,6 +29,12 @@ spring:
       file-size-threshold: 0B
       max-file-size: 100MB
       max-request-size: 100MB
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
 
 management:
   endpoints:
@@ -46,6 +52,7 @@ jwt:
     expire-millis: ${REFRESH_EXPIRE_MILLIS}
 
 auth:
+  host: ${AUTH_HOST}
   grant-type: authorization_code
   kakao:
     client-id: ${FMP_KAKAO_CLIENT_ID}
