@@ -70,10 +70,4 @@ class SignInController(
         val response = signInService.reissueToken(request.refreshToken)
         return SucceededApiResponseBody(data = response)
     }
-
-    @PublicEndPoint
-    @PostMapping("/test")
-    suspend fun test() {
-        authGrpcService.getUserInfo("ddddddddddd")
-    }
 }
