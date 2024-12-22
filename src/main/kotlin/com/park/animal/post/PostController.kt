@@ -14,6 +14,7 @@ import dto.UserContext
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
+import model.Role
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -96,24 +97,43 @@ class PostController(
         @RequestParam lat: Double,
         @RequestParam lng: Double,
         @RequestParam openChatUrl: String?,
+        @RequestParam(required = false) customNickname: String?,
     ): SucceededApiResponseBody<Void> {
-        postService.registerPost(
-            RegisterPostCommand(
-                userId = userContext.getIdIfRequired(),
-                userName = userContext.getNameIfRequired(),
-                images = image,
-                title = title,
-                phoneNum = phoneNum,
-                time = time,
-                place = place,
-                gender = gender,
-                gratuity = gratuity,
-                description = description,
-                lat = lat,
-                lng = lng,
-                openChatUrl = openChatUrl,
-            ),
-        )
+        val command =
+            if (customNickname != null && userContext.role == Role.ROLE_ADMIN) {
+                RegisterPostCommand(
+                    userId = userContext.getIdIfRequired(),
+                    userName = customNickname,
+                    images = image,
+                    title = title,
+                    phoneNum = phoneNum,
+                    time = time,
+                    place = place,
+                    gender = gender,
+                    gratuity = gratuity,
+                    description = description,
+                    lat = lat,
+                    lng = lng,
+                    openChatUrl = openChatUrl,
+                )
+            } else {
+                RegisterPostCommand(
+                    userId = userContext.getIdIfRequired(),
+                    userName = userContext.getNameIfRequired(),
+                    images = image,
+                    title = title,
+                    phoneNum = phoneNum,
+                    time = time,
+                    place = place,
+                    gender = gender,
+                    gratuity = gratuity,
+                    description = description,
+                    lat = lat,
+                    lng = lng,
+                    openChatUrl = openChatUrl,
+                )
+            }
+        postService.registerPost(command)
         return SucceededApiResponseBody(data = null)
     }
 
