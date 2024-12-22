@@ -17,11 +17,14 @@ class AuthGrpcService {
         suspendCancellableCoroutine {
             // 요청 객체 생성
             runCatching {
-                userInfoServiceStub
-                    .withInterceptors(TokenInitializeInMetadata(token))
-                    .getUserInfoByBearer(
-                        Empty.newBuilder().build(),
-                    )
+                val response =
+                    userInfoServiceStub
+                        .withInterceptors(TokenInitializeInMetadata(token))
+                        .getUserInfoByBearer(
+                            Empty.newBuilder().build(),
+                        )
+                log().info("grpc response = ${response.id}")
+                response
             }.onFailure {
                 log().error(it.stackTraceToString())
             }
