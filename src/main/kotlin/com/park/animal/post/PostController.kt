@@ -188,7 +188,7 @@ class PostController(
         return SucceededApiResponseBody(data = null)
     }
 
-    @GetMapping("/me")
+    @GetMapping("/posts/mine")
     @Operation(
         summary = "내가 쓴 게시글",
         description = "현재는 게시글만 조회합니다",
