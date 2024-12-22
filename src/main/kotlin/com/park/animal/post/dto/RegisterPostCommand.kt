@@ -6,6 +6,7 @@ import java.util.UUID
 
 data class RegisterPostCommand(
     val userId: UUID,
+    val userName: String,
     val images: List<MultipartFile>,
     val title: String,
     val phoneNum: String,

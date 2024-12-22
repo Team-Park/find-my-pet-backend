@@ -33,7 +33,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.woo:domain-auth:0.0.6-SNAPSHOT")
+    implementation("org.woo:domain-auth:0.0.9-SNAPSHOT")
     implementation("org.woo:http:+")
     implementation("org.woo:mapper:+")
     implementation("org.woo:log:+")

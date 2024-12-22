@@ -18,7 +18,9 @@ const val POST_TABLE_NAME = "post"
 @SQLDelete(sql = "UPDATE $POST_TABLE_NAME set deleted_at = now() WHERE id = ?")
 class Post(
     @JdbcTypeCode(SqlTypes.VARCHAR)
-    val author: UUID,
+    val authorId: UUID,
+    @Column(name = "author_name")
+    var authorName: String,
     @Column(name = "title")
     var title: String,
     @Column(name = "phone_num")
@@ -41,9 +43,10 @@ class Post(
     var openChatUrl: String?,
 ) : BaseEntity() {
     companion object {
-        fun createPostFromCommand(command: RegisterPostCommand): Post {
-            return Post(
-                author = command.userId,
+        fun createPostFromCommand(command: RegisterPostCommand): Post =
+            Post(
+                authorId = command.userId,
+                authorName = command.userName,
                 title = command.title,
                 time = command.time,
                 phoneNum = command.phoneNum,
@@ -55,7 +58,6 @@ class Post(
                 lng = command.lng,
                 openChatUrl = command.openChatUrl,
             )
-        }
     }
 
     fun update(
