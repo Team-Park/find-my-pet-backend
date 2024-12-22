@@ -13,7 +13,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
 class WebMvcConfig(
     private val jwtTokenInterceptor: JwtTokenInterceptor,
     private val authenticationResolver: AuthenticationResolver,
-
 ) : WebMvcConfigurer {
     override fun addResourceHandlers(registry: ResourceHandlerRegistry) {
         registry.addResourceHandler("/static/**").addResourceLocations("classpath:/static/")
@@ -22,20 +21,22 @@ class WebMvcConfig(
     }
 
     override fun addInterceptors(registry: InterceptorRegistry) {
-        registry.addInterceptor(jwtTokenInterceptor)
+        registry
+            .addInterceptor(jwtTokenInterceptor)
             .addPathPatterns("/api/**")
     }
 
     override fun addCorsMappings(registry: CorsRegistry) {
-        registry.addMapping("/**")
+        registry
+            .addMapping("/**")
             .allowedOriginPatterns(
                 "http://localhost:[*]",
                 "https://localhost:[*]",
                 "https://find-my-pet-frontend.vercel.app",
                 "https://findmypet.site",
                 "https://www.findmypet.site",
-            )
-            .allowedHeaders("*")
+                "*",
+            ).allowedHeaders("*")
             .allowedMethods("*")
     }
 
