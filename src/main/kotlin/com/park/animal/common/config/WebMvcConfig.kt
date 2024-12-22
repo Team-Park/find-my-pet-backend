@@ -27,17 +27,17 @@ class WebMvcConfig(
     }
 
     override fun addCorsMappings(registry: CorsRegistry) {
-        registry
-            .addMapping("/**")
-            .allowedOriginPatterns(
-                "http://localhost:[*]",
-                "https://localhost:[*]",
-                "https://find-my-pet-frontend.vercel.app",
-                "https://findmypet.site",
-                "https://www.findmypet.site",
-                "*",
-            ).allowedHeaders("*")
-            .allowedMethods("*")
+//        registry
+//            .addMapping("/**")
+//            .allowedOriginPatterns(
+//                "http://localhost:[*]",
+//                "https://localhost:[*]",
+//                "https://find-my-pet-frontend.vercel.app",
+//                "https://findmypet.site",
+//                "https://www.findmypet.site",
+//                "*",
+//            ).allowedHeaders("*")
+//            .allowedMethods("*")
     }
 
     override fun addArgumentResolvers(resolvers: MutableList<HandlerMethodArgumentResolver>) {
