@@ -1,14 +1,16 @@
 package com.park.animal.common.interceptor
 
 import annotation.PublicEndPoint
-import com.park.animal.auth.service.JwtTokenService
+import com.park.animal.auth.external.AuthGrpcService
 import com.park.animal.common.constants.AuthConstants
 import com.park.animal.common.constants.AuthConstants.AUTHORIZATION_HEADER
 import com.park.animal.common.constants.AuthConstants.BEARER_PREFIX
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.NoBearerTokenException
+import constant.AuthConstant
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import kotlinx.coroutines.runBlocking
 import org.springframework.http.HttpMethod
 import org.springframework.stereotype.Component
 import org.springframework.web.method.HandlerMethod
@@ -16,9 +18,13 @@ import org.springframework.web.servlet.HandlerInterceptor
 
 @Component
 class JwtTokenInterceptor(
-    private val jwtTokenService: JwtTokenService,
+    val authGrpcService: AuthGrpcService,
 ) : HandlerInterceptor {
-    override fun preHandle(request: HttpServletRequest, response: HttpServletResponse, handler: Any): Boolean {
+    override fun preHandle(
+        request: HttpServletRequest,
+        response: HttpServletResponse,
+        handler: Any,
+    ): Boolean {
         if (request.method.equals(HttpMethod.OPTIONS.name())) {
             return true
         }
@@ -29,12 +35,15 @@ class JwtTokenInterceptor(
     private fun initializeTokenIfNeeded(
         request: HttpServletRequest,
         handlerMethod: HandlerMethod?,
-    ): Boolean {
-        return runCatching {
+    ): Boolean =
+        runCatching {
             val token = request.getBearerTokenFromHeader()
-            val claim = jwtTokenService.parseAccessToken(token)
-            request.setAttribute(AuthConstants.USER_ID, claim[AuthConstants.USER_ID])
-            request.setAttribute(AuthConstants.USER_ROLE, claim[AuthConstants.USER_ROLE])
+            val userInfo = runBlocking { authGrpcService.getUserInfo(token) }
+
+            request.setAttribute(AuthConstants.USER_ID, userInfo.id)
+            request.setAttribute(AuthConstants.USER_ROLE, userInfo.role)
+            request.setAttribute(AuthConstant.USER_NAME, userInfo.name)
+            request.setAttribute(AuthConstant.USER_EMAIL, userInfo.email)
             true
         }.getOrElse {
             val publicEndPoint = handlerMethod?.hasMethodAnnotation(PublicEndPoint::class.java) ?: false
@@ -44,7 +53,6 @@ class JwtTokenInterceptor(
                 throw it
             }
         }
-    }
 }
 
 fun HttpServletRequest.getBearerTokenFromHeader(): String {

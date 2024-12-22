@@ -5,6 +5,7 @@ import com.park.animal.common.http.error.exception.BusinessException
 import com.park.animal.common.http.error.exception.ImageUploadException
 import com.park.animal.multimedia.MultimediaService
 import com.park.animal.post.dto.PostDetailResponse
+import com.park.animal.post.dto.PostSummaryResponse
 import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageDto
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
@@ -34,9 +35,10 @@ class PostService(
     suspend fun registerPost(command: RegisterPostCommand) {
         coroutineScope {
             val post = Post.createPostFromCommand(command)
-            val postEntity = withContext(Dispatchers.IO) {
-                postRepository.save(post)
-            }
+            val postEntity =
+                withContext(Dispatchers.IO) {
+                    postRepository.save(post)
+                }
             if (command.images.isNotEmpty()) {
                 val uploadImages = uploadImages(command.images)
                 withContext(Dispatchers.IO) {
@@ -46,47 +48,59 @@ class PostService(
         }
     }
 
-    private suspend fun uploadImages(images: List<MultipartFile>): List<String> {
-        return multimediaService.uploadMultipartFiles(images) ?: throw ImageUploadException()
-    }
+    private suspend fun uploadImages(images: List<MultipartFile>): List<String> =
+        multimediaService.uploadMultipartFiles(images) ?: throw ImageUploadException()
 
-    private suspend fun savePostImages(post: Post, imageUrls: List<String>) {
+    private suspend fun savePostImages(
+        post: Post,
+        imageUrls: List<String>,
+    ) {
         imageUrls.forEach { url ->
-            val postImage = PostImage(
-                post = post,
-                imageUrl = url,
-            )
+            val postImage =
+                PostImage(
+                    post = post,
+                    imageUrl = url,
+                )
             postImageRepository.save(postImage)
         }
     }
 
     @Transactional(readOnly = true)
-    fun findDetailPost(id: UUID, userId: UUID?): PostDetailResponse = postRepository.findPostDetailWithImages(id, userId)
-        ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
+    fun findDetailPost(
+        id: UUID,
+        userId: UUID?,
+    ): PostDetailResponse =
+        postRepository.findPostDetailWithImages(id, userId)
+            ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
 
     @Transactional(readOnly = true)
-    fun findPostList(query: SummarizedPostsByPageQuery): SummarizedPostsByPageDto {
-        return postRepository.findSummarizedPostsByPage(
+    fun findPostList(query: SummarizedPostsByPageQuery): SummarizedPostsByPageDto =
+        postRepository.findSummarizedPostsByPage(
             size = query.size,
             orderBy = query.orderBy,
             page = query.offset,
         )
-    }
 
     @Transactional
-    fun deletePost(postId: UUID, userId: UUID) {
+    fun deletePost(
+        postId: UUID,
+        userId: UUID,
+    ) {
         val post = getPostEntity(postId)
 
-        if (post.author != userId) {
+        if (post.authorId != userId) {
             throw BusinessException(ErrorCode.FORBIDDEN)
         }
         postRepository.delete(post)
     }
 
     @Transactional
-    fun updatePost(command: UpdatePostRequest, userId: UUID) {
+    fun updatePost(
+        command: UpdatePostRequest,
+        userId: UUID,
+    ) {
         val post = getPostEntity(command.postId)
-        if (post.author != userId) {
+        if (post.authorId != userId) {
             throw BusinessException(ErrorCode.FORBIDDEN)
         }
         post.update(
@@ -104,9 +118,13 @@ class PostService(
     }
 
     @Transactional
-    fun addPostImage(images: List<MultipartFile>, postId: UUID, userId: UUID) {
+    fun addPostImage(
+        images: List<MultipartFile>,
+        postId: UUID,
+        userId: UUID,
+    ) {
         val postEntity = getPostEntity(postId)
-        if (postEntity.author != userId) {
+        if (postEntity.authorId != userId) {
             throw BusinessException(ErrorCode.FORBIDDEN)
         }
         runBlocking {
@@ -116,19 +134,26 @@ class PostService(
     }
 
     @Transactional
-    fun deletePostImage(userId: UUID, postImageId: UUID, postId: UUID) {
+    fun deletePostImage(
+        userId: UUID,
+        postImageId: UUID,
+        postId: UUID,
+    ) {
         val post = getPostEntity(postId)
-        if (post.author != userId) {
+        if (post.authorId != userId) {
             throw BusinessException(ErrorCode.FORBIDDEN)
         }
         val postImageEntity = getPostImageEntity(postImageId)
         postImageRepository.delete(postImageEntity)
     }
 
-    private fun getPostEntity(id: UUID) =
-        postRepository.findById(id).getOrNull() ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
+    private fun getPostEntity(id: UUID) = postRepository.findById(id).getOrNull() ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
 
-    private fun getPostImageEntity(id: UUID) = postImageRepository.findById(id).getOrElse {
-        throw BusinessException(ErrorCode.NOT_FOUND_POST_IMAGE)
-    }
+    private fun getPostImageEntity(id: UUID) =
+        postImageRepository.findById(id).getOrElse {
+            throw BusinessException(ErrorCode.NOT_FOUND_POST_IMAGE)
+        }
+
+    @Transactional(readOnly = true)
+    fun myPage(userId: UUID): List<PostSummaryResponse> = postRepository.findSummarizedPostsByUserId(userId)
 }

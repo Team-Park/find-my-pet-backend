@@ -28,7 +28,7 @@ import org.woo.http.PaginatedApiResponseBody
 import org.woo.http.PaginatedApiResponseDto
 import org.woo.http.SucceededApiResponseBody
 import java.time.LocalDateTime
-import java.util.*
+import java.util.UUID
 
 @RestController
 @RequestMapping("/api/v1")
@@ -45,18 +45,20 @@ class PostController(
         @RequestParam(name = "pageOffset", required = false, defaultValue = "0") offset: Long,
         @RequestParam(name = "orderBy", required = false, defaultValue = "CREATED_AT_DESC") orderBy: OrderBy,
     ): PaginatedApiResponseBody<PostSummaryResponse> {
-        val query: SummarizedPostsByPageQuery = SummarizedPostsByPageQuery(
-            size = size,
-            offset = offset,
-            orderBy = orderBy,
-        )
+        val query: SummarizedPostsByPageQuery =
+            SummarizedPostsByPageQuery(
+                size = size,
+                offset = offset,
+                orderBy = orderBy,
+            )
         val response = postService.findPostList(query)
         return PaginatedApiResponseBody(
-            data = PaginatedApiResponseDto(
-                contents = response.result,
-                hasNextPage = response.hasNextPage,
-                totalCount = response.totalCount,
-            ),
+            data =
+                PaginatedApiResponseDto(
+                    contents = response.result,
+                    hasNextPage = response.hasNextPage,
+                    totalCount = response.totalCount,
+                ),
         )
     }
 
@@ -97,7 +99,8 @@ class PostController(
     ): SucceededApiResponseBody<Void> {
         postService.registerPost(
             RegisterPostCommand(
-                userId = userContext.userId!!,
+                userId = userContext.getIdIfRequired(),
+                userName = userContext.getNameIfRequired(),
                 images = image,
                 title = title,
                 phoneNum = phoneNum,
@@ -183,5 +186,20 @@ class PostController(
     ): SucceededApiResponseBody<Void> {
         postService.deletePost(postId = id, userId = userContext.getIdIfRequired())
         return SucceededApiResponseBody(data = null)
+    }
+
+    @GetMapping("/me")
+    @Operation(
+        summary = "내가 쓴 게시글",
+        description = "현재는 게시글만 조회합니다",
+        security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
+    )
+    fun myPage(
+        @AuthenticationUser
+        @Parameter(hidden = true)
+        userContext: UserContext,
+    ): SucceededApiResponseBody<List<PostSummaryResponse>> {
+        val response = postService.myPage(userId = userContext.getIdIfRequired())
+        return SucceededApiResponseBody(data = response)
     }
 }
