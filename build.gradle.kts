@@ -104,7 +104,7 @@ dependencies {
 //        exclude(group = "io.grpc", module = "grpc-")
     }
     implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
-    implementation("org.woo:grpc:0.0.6-SNAPSHOT")
+    implementation("org.woo:grpc:0.0.7-SNAPSHOT")
 }
 
 kotlin {
