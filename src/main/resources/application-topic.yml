@@ -1,0 +1,3 @@
+topic:
+  #  name-update: ${spring.config.activate.on-profile}-user-name
+  name-update: user-name

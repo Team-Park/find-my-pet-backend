@@ -1,6 +1,8 @@
 spring:
   profiles:
     active: dev
+  config:
+    import: application-topic.yml
   application:
     name: ${spring.profiles.active}-fmp-backend
   data:
@@ -29,6 +31,15 @@ spring:
       file-size-threshold: 0B
       max-file-size: 100MB
       max-request-size: 100MB
+  kafka:
+    bootstrap-servers: ${consume.kafka.bootstrap.server}
+    consumer:
+      group-id: ${spring.application.name}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+
+
 eureka:
   client:
     service-url:
@@ -43,23 +54,8 @@ management:
         include: health,info,metrics,prometheus
 
 # custom env
-jwt:
-  access-token:
-    secret-key: ${ACCESS_SECRET_KEY}
-    expire-millis: ${ACCESS_EXPIRE_MILLIS}
-  refresh-token:
-    secret-key: ${REFRESH_SECRET_KEY}
-    expire-millis: ${REFRESH_EXPIRE_MILLIS}
-
 auth:
   discovery-host: 'discovery:///${spring.profiles.active}-${AUTH_HOST}'
-  grant-type: authorization_code
-  kakao:
-    client-id: ${FMP_KAKAO_CLIENT_ID}
-  google:
-    client-id: ${FMP_GOOGLE_CLIENT_ID}
-    client-secret: ${FMP_GOOGLE_CLIENT_SECRET}
-
 aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
@@ -75,3 +71,8 @@ grpc:
       enableKeepAlive: true
       keepAliveWithoutCalls: true
       negotiationType: plaintext
+
+consume:
+  kafka:
+    bootstrap:
+      server: ${KAFKA_HOST}

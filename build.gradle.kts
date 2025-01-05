@@ -33,7 +33,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.woo:domain-auth:0.0.9-SNAPSHOT")
+    implementation("org.woo:domain-auth:+")
     implementation("org.woo:http:+")
     implementation("org.woo:mapper:+")
     implementation("org.woo:log:+")
@@ -104,7 +104,11 @@ dependencies {
 //        exclude(group = "io.grpc", module = "grpc-")
     }
     implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
-    implementation("org.woo:grpc:0.0.7-SNAPSHOT")
+    implementation("org.woo:grpc:+")
+
+    // kafka
+    implementation("org.springframework.kafka:spring-kafka")
+    testImplementation("org.springframework.kafka:spring-kafka-test")
 }
 
 kotlin {
