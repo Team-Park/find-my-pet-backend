@@ -34,6 +34,7 @@ class KafkaConfig(
         props[ConsumerConfig.GROUP_ID_CONFIG] = groupId
         props[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
         props[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
+        props[ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG] = true
         return props
     }
 
