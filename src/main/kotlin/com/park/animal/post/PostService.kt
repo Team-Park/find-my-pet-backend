@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.multipart.MultipartFile
-import java.util.UUID
+import java.util.*
 import kotlin.jvm.optionals.getOrElse
 import kotlin.jvm.optionals.getOrNull
 
@@ -31,6 +31,10 @@ class PostService(
     private val multimediaService: MultimediaService,
     private val postImageRepository: PostImageRepository,
 ) {
+    companion object {
+        const val CANCEL_USER_NAME = "탈퇴한 사용자"
+    }
+
     @Transactional
     suspend fun registerPost(command: RegisterPostCommand) {
         coroutineScope {
@@ -156,4 +160,15 @@ class PostService(
 
     @Transactional(readOnly = true)
     fun myPage(userId: UUID): List<PostSummaryResponse> = postRepository.findSummarizedPostsByUserId(userId)
+
+    fun updateAuthor(
+        userId: UUID,
+        name: String,
+    ) {
+        postRepository.updateAuthorName(userId, name)
+    }
+
+    fun deleteAuthor(userId: UUID) {
+        postRepository.updateAuthorName(userId, CANCEL_USER_NAME)
+    }
 }
