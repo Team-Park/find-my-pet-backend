@@ -4,6 +4,7 @@ import com.park.animal.event.dto.UpdateNameEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.launch
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.kafka.support.JacksonUtils
 import org.springframework.messaging.handler.annotation.Payload
@@ -11,7 +12,9 @@ import org.springframework.stereotype.Component
 import java.util.concurrent.Executors
 
 @Component
-class KafkaConsumer {
+class KafkaConsumer(
+    val applicationEventPublisher: ApplicationEventPublisher,
+) {
     private val executor = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     private val scope = CoroutineScope(executor)
 
@@ -20,7 +23,8 @@ class KafkaConsumer {
         @Payload payload: String,
     ) {
         scope.launch {
-            val json = JacksonUtils.enhancedObjectMapper().readValue(payload, UpdateNameEvent::class.java)
+            val event = JacksonUtils.enhancedObjectMapper().readValue(payload, UpdateNameEvent::class.java)
+            applicationEventPublisher.publishEvent(event)
         }
     }
 }
