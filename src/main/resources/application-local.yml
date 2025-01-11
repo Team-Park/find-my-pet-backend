@@ -24,10 +24,10 @@ aws:
 cloud-front:
   domain: ${CLOUD_FRONT_DOMAIN_NAME:https://d3vt348duxk7vk.cloudfront.net}
 
-server:
-  port: 8081
-
 consume:
   kafka:
     bootstrap:
       server: localhost:9092
+
+server:
+  port: 8081

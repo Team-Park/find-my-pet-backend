@@ -20,11 +20,21 @@ import com.querydsl.core.types.dsl.Expressions
 import com.querydsl.jpa.JPAExpressions
 import com.querydsl.jpa.impl.JPAQueryFactory
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
+import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import java.util.UUID
 
 interface PostRepository :
     JpaRepository<Post, UUID>,
-    PostQueryRepository
+    PostQueryRepository {
+    @Modifying
+    @Query("UPDATE Post p SET p.authorName = :newName WHERE p.authorId = :authorId")
+    fun updateAuthorName(
+        @Param("authorId") authorId: UUID,
+        @Param("newName") newName: String,
+    )
+}
 
 interface PostQueryRepository {
     fun findPostDetailWithImages(
