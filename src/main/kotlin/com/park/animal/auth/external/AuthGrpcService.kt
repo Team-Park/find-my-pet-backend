@@ -4,9 +4,9 @@ import com.google.protobuf.Empty
 import kotlinx.coroutines.suspendCancellableCoroutine
 import net.devh.boot.grpc.client.inject.GrpcClient
 import org.springframework.stereotype.Service
+import org.woo.apm.log.log
 import org.woo.auth.grpc.AuthProto
 import org.woo.auth.grpc.UserInfoServiceGrpc
-import org.woo.log.log
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 

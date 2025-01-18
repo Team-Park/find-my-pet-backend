@@ -8,19 +8,25 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.woo.apm.log.log
 import org.woo.http.FailedApiResponseBody
-import org.woo.log.log
 
 @RestControllerAdvice
 class GlobalExceptionController {
     @ExceptionHandler(BusinessException::class)
-    fun businessException(e: BusinessException, request: HttpServletRequest): ResponseEntity<FailedApiResponseBody> {
+    fun businessException(
+        e: BusinessException,
+        request: HttpServletRequest,
+    ): ResponseEntity<FailedApiResponseBody> {
         outputLog(errorCode = e.errorCode, e = e, path = request.requestURI)
         return e.toFailedBody()
     }
 
     @ExceptionHandler(AuthException::class)
-    fun authExceptions(e: AuthException, request: HttpServletRequest): ResponseEntity<FailedApiResponseBody> {
+    fun authExceptions(
+        e: AuthException,
+        request: HttpServletRequest,
+    ): ResponseEntity<FailedApiResponseBody> {
         outputLog(errorCode = e.errorCode, e = e, path = request.requestURI)
         return e.toFailedBody()
     }
@@ -34,17 +40,21 @@ class GlobalExceptionController {
         return e.toFailedBody()
     }
 
-    private fun outputLog(errorCode: ErrorCode, e: Exception, path: String) {
+    private fun outputLog(
+        errorCode: ErrorCode,
+        e: Exception,
+        path: String,
+    ) {
         when (errorCode.level) {
             LogLevel.ERROR -> {
                 log().error(
                     """
-            errorCode = ${errorCode.name}
-            message = ${errorCode.message}
-            requestPath = $path
-            stackTrace = ${e.cause?.printStackTrace()}
-            cause = ${e.cause}
-            message = ${e.message}
+                    errorCode = ${errorCode.name}
+                    message = ${errorCode.message}
+                    requestPath = $path
+                    stackTrace = ${e.cause?.printStackTrace()}
+                    cause = ${e.cause}
+                    message = ${e.message}
                     """.trimIndent(),
                 )
             }
@@ -52,12 +62,12 @@ class GlobalExceptionController {
             LogLevel.WARN -> {
                 log().warn(
                     """
-            errorCode = ${errorCode.name}
-            message = ${errorCode.message}
-            requestPath = $path
-            stackTrace = ${e.cause?.printStackTrace()}
-            cause = ${e.cause}
-            message = ${e.message}
+                    errorCode = ${errorCode.name}
+                    message = ${errorCode.message}
+                    requestPath = $path
+                    stackTrace = ${e.cause?.printStackTrace()}
+                    cause = ${e.cause}
+                    message = ${e.message}
                     """.trimIndent(),
                 )
             }
