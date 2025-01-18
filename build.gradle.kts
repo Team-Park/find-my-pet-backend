@@ -36,7 +36,7 @@ dependencies {
     implementation("org.woo:domain-auth:+")
     implementation("org.woo:http:+")
     implementation("org.woo:mapper:+")
-    implementation("org.woo:log:+")
+    implementation("org.woo:apm:+")
 
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
