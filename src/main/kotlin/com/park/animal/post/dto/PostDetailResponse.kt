@@ -1,5 +1,6 @@
 package com.park.animal.post.dto
 
+import com.park.animal.post.entity.MissingAnimalStatus
 import java.time.LocalDateTime
 
 data class PostDetailResponse(
@@ -13,6 +14,7 @@ data class PostDetailResponse(
     val description: String,
     val coordinate: Coordinate,
     val openChatUrl: String?,
+    val missingAnimalStatus: MissingAnimalStatus,
     var isMine: Boolean,
 ) {
     lateinit var imageUrls: List<PostImageResponse>
@@ -28,6 +30,7 @@ data class PostDetailResponse(
         description: String,
         coordinate: Coordinate,
         openChatUrl: String?,
+        missingAnimalStatus: MissingAnimalStatus,
         isMineInt: Int,
     ) : this(
         name,
@@ -40,6 +43,7 @@ data class PostDetailResponse(
         description,
         coordinate,
         openChatUrl,
+        missingAnimalStatus,
         isMineInt == 1,
     )
 }

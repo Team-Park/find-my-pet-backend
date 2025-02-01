@@ -1,5 +1,6 @@
 package com.park.animal.post.dto
 
+import com.park.animal.post.entity.MissingAnimalStatus
 import io.swagger.v3.oas.annotations.media.Schema
 import java.time.LocalDateTime
 import java.util.UUID
@@ -17,4 +18,5 @@ data class UpdatePostRequest(
     val lat: Double,
     val lng: Double,
     val openChatUrl: String?,
+    val missingAnimalStatus: MissingAnimalStatus,
 )

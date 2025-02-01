@@ -118,6 +118,7 @@ class PostService(
             lat = command.lat,
             lng = command.lng,
             openChatUrl = command.openChatUrl,
+            missingAnimalStatus = command.missingAnimalStatus,
         )
     }
 
