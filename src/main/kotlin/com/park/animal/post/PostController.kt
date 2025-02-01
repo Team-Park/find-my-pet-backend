@@ -226,7 +226,10 @@ class PostController(
     }
 
     @PatchMapping("/post/renewal-status")
-    @Operation()
+    @Operation(
+        summary = "게시글 상태 변경",
+        security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
+    )
     fun updateMissingAnimalStatus(
         @AuthenticationUser
         @Parameter(hidden = true)
