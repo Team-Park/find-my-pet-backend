@@ -4,6 +4,8 @@ import com.park.animal.common.persistence.BaseEntity
 import com.park.animal.post.dto.RegisterPostCommand
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
+import jakarta.persistence.EnumType.STRING
+import jakarta.persistence.Enumerated
 import org.hibernate.annotations.DynamicUpdate
 import org.hibernate.annotations.JdbcTypeCode
 import org.hibernate.annotations.SQLDelete
@@ -41,6 +43,9 @@ class Post(
     var lng: Double,
     @Column(name = "open_chat_url", nullable = true)
     var openChatUrl: String?,
+    @Enumerated(STRING)
+    @Column(name = "missing_animal_status")
+    var missingAnimalStatus: MissingAnimalStatus,
 ) : BaseEntity() {
     companion object {
         fun createPostFromCommand(command: RegisterPostCommand): Post =
@@ -57,6 +62,7 @@ class Post(
                 lat = command.lat,
                 lng = command.lng,
                 openChatUrl = command.openChatUrl,
+                missingAnimalStatus = MissingAnimalStatus.SEARCHING,
             )
     }
 
@@ -71,6 +77,7 @@ class Post(
         lat: Double,
         lng: Double,
         openChatUrl: String?,
+        missingAnimalStatus: MissingAnimalStatus,
     ) {
         this.gender = gender
         this.time = time
@@ -82,5 +89,6 @@ class Post(
         this.lat = lat
         this.lng = lng
         this.openChatUrl = openChatUrl
+        this.missingAnimalStatus = missingAnimalStatus
     }
 }
