@@ -1,6 +1,9 @@
 name: Build image if not exists and Trigger dispatch to deploy
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - develop
 
 permissions:
   contents: read
