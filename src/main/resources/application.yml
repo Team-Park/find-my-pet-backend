@@ -1,26 +1,78 @@
 spring:
   profiles:
-    active:
+    active: dev
+  config:
+    import: application-topic.yml
+  application:
+    name: ${spring.profiles.active}-fmp-backend
+  data:
+    redis:
+      port: ${REDIS_PORT:6379}
+      host: ${REDIS_HOST}
+      password: ${REDIS_PASSWORD}
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${RDBMS_URI:localhost}:3306/findmypet?useUnicode=yes&characterEncoding=UTF-8&connectTimeout=2000&autoReconnect=true&serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true
     username: ${RDBMS_USERNAME:root}
     password: ${RDBMS_PASSWORD:1234}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        default_batch_fetch_size: 1000
+        dialect: org.hibernate.dialect.MySQLDialect
+    show-sql: true
+    hibernate:
+      # 추후 flyway 등 전환 고려
+      ddl-auto: update
+  servlet:
+    multipart:
+      enabled: true
+      file-size-threshold: 0B
+      max-file-size: 100MB
+      max-request-size: 100MB
+  kafka:
+    bootstrap-servers: ${consume.kafka.bootstrap.server}
+    consumer:
+      group-id: ${spring.application.name}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
 
 
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: false
 
-jwt:
-  access-token:
-    secret-key: ${ACCESS_SECRET_KEY:qwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwqwq}
-    expire-millis: ${ACCESS_EXPIRE_MILLIS:1000000}
-  refresh-token:
-    secret-key: ${REFRESH_SECRET_KEY:asasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasaasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasaasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasasa}
-    expire-millis: ${REFRESH_EXPIRE_MILLIS:100000000}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
 
+# custom env
 auth:
-  grant-type: authorization_code
-  kakao:
-    client-id:
-  google:
-    client-id:
-    client-secret:
+  discovery-host: 'discovery:///${spring.profiles.active}-${AUTH_HOST}'
+aws:
+  s3:
+    bucket-name: ${AWS_S3_BUCKET_NAME}
+    access-key: ${AWS_S3_ACCESS_KEY}
+    secret-key: ${AWS_S3_SECRET_KEY}
+
+cloud-front:
+  domain: ${CLOUD_FRONT_DOMAIN_NAME}
+grpc:
+  client:
+    auth:
+      address: ${auth.discovery-host}
+      enableKeepAlive: true
+      keepAliveWithoutCalls: true
+      negotiationType: plaintext
+
+consume:
+  kafka:
+    bootstrap:
+      server: ${KAFKA_HOST}
