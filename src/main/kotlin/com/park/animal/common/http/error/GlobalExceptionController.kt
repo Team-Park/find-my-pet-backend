@@ -52,7 +52,7 @@ class GlobalExceptionController {
                     errorCode = ${errorCode.name}
                     message = ${errorCode.message}
                     requestPath = $path
-                    stackTrace = ${e.cause?.printStackTrace()}
+                    stackTrace = ${e.printStackTrace()}
                     cause = ${e.cause}
                     message = ${e.message}
                     """.trimIndent(),

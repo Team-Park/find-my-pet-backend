@@ -24,7 +24,15 @@ spring:
     show-sql: true
     hibernate:
       # 추후 flyway 등 전환 고려
-      ddl-auto: update
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    url: ${spring.datasource.url}
+    user: ${spring.datasource.username}
+    password: ${spring.datasource.password}
+    locations: classpath:db/migration
   servlet:
     multipart:
       enabled: true

@@ -34,7 +34,7 @@ repositories {
 
 dependencies {
     implementation("org.woo:domain-auth:+")
-    implementation("org.woo:http:+")
+    implementation("org.woo:http:0.1.1")
     implementation("org.woo:mapper:+")
     implementation("org.woo:apm:+")
 
@@ -109,6 +109,10 @@ dependencies {
     // kafka
     implementation("org.springframework.kafka:spring-kafka")
     testImplementation("org.springframework.kafka:spring-kafka-test")
+
+    // flyway for db migration
+    implementation("org.flywaydb:flyway-core:10.19.0")
+    implementation("org.flywaydb:flyway-mysql:10.19.0")
 }
 
 kotlin {

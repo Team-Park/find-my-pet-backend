@@ -10,6 +10,7 @@ import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageDto
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
 import com.park.animal.post.dto.UpdatePostRequest
+import com.park.animal.post.entity.MissingAnimalStatus
 import com.park.animal.post.entity.Post
 import com.park.animal.post.entity.PostImage
 import com.park.animal.post.repository.PostImageRepository
@@ -171,5 +172,18 @@ class PostService(
 
     fun deleteAuthor(userId: UUID) {
         postRepository.updateAuthorName(userId, CANCEL_USER_NAME)
+    }
+
+    @Transactional
+    fun updateStatus(
+        postId: UUID,
+        userId: UUID,
+        status: MissingAnimalStatus,
+    ) {
+        val post = getPostEntity(postId)
+        if (post.authorId != userId) {
+            throw BusinessException(ErrorCode.FORBIDDEN)
+        }
+        post.updateStatus(status)
     }
 }
