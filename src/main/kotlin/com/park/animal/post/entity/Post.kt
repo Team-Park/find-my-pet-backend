@@ -91,4 +91,8 @@ class Post(
         this.openChatUrl = openChatUrl
         this.missingAnimalStatus = missingAnimalStatus
     }
+
+    fun updateStatus(renewalStatus: MissingAnimalStatus) {
+        this.missingAnimalStatus = renewalStatus
+    }
 }

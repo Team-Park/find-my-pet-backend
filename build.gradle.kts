@@ -34,7 +34,7 @@ repositories {
 
 dependencies {
     implementation("org.woo:domain-auth:+")
-    implementation("org.woo:http:+")
+    implementation("org.woo:http:0.1.1")
     implementation("org.woo:mapper:+")
     implementation("org.woo:apm:+")
 

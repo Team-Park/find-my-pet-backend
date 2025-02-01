@@ -10,6 +10,7 @@ import com.park.animal.post.dto.PostSummaryResponse
 import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
 import com.park.animal.post.dto.UpdatePostRequest
+import com.park.animal.post.entity.MissingAnimalStatus
 import dto.UserContext
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -17,6 +18,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import model.Role
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.PutMapping
@@ -221,5 +223,24 @@ class PostController(
     ): SucceededApiResponseBody<List<PostSummaryResponse>> {
         val response = postService.myPage(userId = userContext.getIdIfRequired())
         return SucceededApiResponseBody(data = response)
+    }
+
+    @PatchMapping("/post/renewal-status")
+    @Operation()
+    fun updateMissingAnimalStatus(
+        @AuthenticationUser
+        @Parameter(hidden = true)
+        userContext: UserContext,
+        @RequestParam("missingAnimalStatus")
+        missingAnimalStatus: MissingAnimalStatus,
+        @RequestParam("postId")
+        postId: UUID,
+    ): SucceededApiResponseBody<Unit> {
+        postService.updateStatus(
+            userId = userContext.getIdIfRequired(),
+            postId = postId,
+            status = missingAnimalStatus,
+        )
+        return SucceededApiResponseBody.succeed()
     }
 }
