@@ -62,7 +62,7 @@ class Post(
                 lat = command.lat,
                 lng = command.lng,
                 openChatUrl = command.openChatUrl,
-                missingAnimalStatus = MissingAnimalStatus.SEARCHING,
+                missingAnimalStatus = command.missingAnimalStatus,
             )
     }
 

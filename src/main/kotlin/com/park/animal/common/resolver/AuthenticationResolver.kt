@@ -28,8 +28,5 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
         return passport
     }
 
-    private fun shouldAuthenticate(parameter: MethodParameter): Boolean {
-        val authenticationUser = parameter.getParameterAnnotation(AuthenticationUser::class.java)
-        return authenticationUser?.isRequired ?: false
-    }
+    private fun shouldAuthenticate(parameter: MethodParameter): Boolean = parameter.hasParameterAnnotation(AuthenticationUser::class.java)
 }

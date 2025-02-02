@@ -100,6 +100,7 @@ class PostController(
         @RequestParam lng: Double,
         @RequestParam openChatUrl: String?,
         @RequestParam(required = false) customNickname: String?,
+        @RequestParam missingAnimalStatus: MissingAnimalStatus,
     ): SucceededApiResponseBody<Void> {
         val command =
             if (customNickname != null && userContext.role == Role.ROLE_ADMIN) {
@@ -117,6 +118,7 @@ class PostController(
                     lat = lat,
                     lng = lng,
                     openChatUrl = openChatUrl,
+                    missingAnimalStatus = missingAnimalStatus,
                 )
             } else {
                 RegisterPostCommand(
@@ -133,6 +135,7 @@ class PostController(
                     lat = lat,
                     lng = lng,
                     openChatUrl = openChatUrl,
+                    missingAnimalStatus = missingAnimalStatus,
                 )
             }
         postService.registerPost(command)

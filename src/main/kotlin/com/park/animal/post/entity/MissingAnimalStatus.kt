@@ -8,4 +8,6 @@ enum class MissingAnimalStatus {
 
     @Schema(description = "유실동물 찾음")
     FOUND,
+
+    SEEN,
 }

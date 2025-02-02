@@ -1,5 +1,6 @@
 package com.park.animal.post.dto
 
+import com.park.animal.post.entity.MissingAnimalStatus
 import org.springframework.web.multipart.MultipartFile
 import java.time.LocalDateTime
 import java.util.UUID
@@ -18,4 +19,5 @@ data class RegisterPostCommand(
     val lat: Double,
     val lng: Double,
     val openChatUrl: String?,
+    val missingAnimalStatus: MissingAnimalStatus,
 )
