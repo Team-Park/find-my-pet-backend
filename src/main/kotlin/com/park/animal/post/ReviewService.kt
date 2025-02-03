@@ -23,6 +23,7 @@ class ReviewService(
         authorName: String,
         title: String,
         content: String,
+        categoryId: String,
     ) {
         val review =
             Review.create(
@@ -30,6 +31,7 @@ class ReviewService(
                 authorId = userId,
                 title = title,
                 content = content,
+                categoryId = categoryId,
                 fields = emptyMap(),
             )
         reviewRepository.save(review)
