@@ -28,6 +28,7 @@ class Review(
             title: String,
             content: String,
             fields: Map<String, Any>,
+            categoryId: String,
         ): Review =
             Review(
                 authorId = authorId,
@@ -35,6 +36,7 @@ class Review(
                 dynamicFields = fields.toMutableMap(),
                 title = title,
                 content = content,
+                categoryId = categoryId,
             )
     }
 }

@@ -45,6 +45,7 @@ class ReviewController(
             authorName = userContext.getNameIfRequired(),
             title = request.title,
             content = request.content,
+            categoryId = request.categoryId,
         )
         return SucceededApiResponseBody.succeed()
     }
