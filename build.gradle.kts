@@ -113,6 +113,9 @@ dependencies {
     // flyway for db migration
     implementation("org.flywaydb:flyway-core:10.19.0")
     implementation("org.flywaydb:flyway-mysql:10.19.0")
+
+    // mongodb
+    implementation("org.springframework.boot:spring-boot-starter-data-mongodb")
 }
 
 kotlin {

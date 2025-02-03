@@ -6,6 +6,8 @@ spring:
   application:
     name: ${spring.profiles.active}-fmp-backend
   data:
+    mongodb:
+      uri: mongodb://${MONGODB_USERNAME}:${MONGODB_PASSWORD}@${MONGODB_HOST}:27017/post?authSource=admin
     redis:
       port: ${REDIS_PORT:6379}
       host: ${REDIS_HOST}
