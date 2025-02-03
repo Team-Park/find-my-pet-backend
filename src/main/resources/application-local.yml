@@ -3,6 +3,8 @@ spring:
     activate:
       on-profile: local
   data:
+    mongodb:
+      uri: mongodb://root:1234@localhost:27017/post?authSource=admin
     redis:
       port: 6379
       host: localhost

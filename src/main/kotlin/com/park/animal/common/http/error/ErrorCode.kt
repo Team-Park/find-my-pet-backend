@@ -31,6 +31,9 @@ enum class ErrorCode(
     FAILURE_UPLOAD_IMAGE("이미지 업로드하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR, ERROR),
     NOT_FOUND_POST_IMAGE("게시글 이미지 조회 실패", HttpStatus.BAD_REQUEST, WARN),
 
+    // review
+    NOT_FOUND_REVIEW("리뷰 상세조회 실패", HttpStatus.BAD_REQUEST, WARN),
+
     UNKNOWN_ERROR("알 수 없는 에러", HttpStatus.INTERNAL_SERVER_ERROR, ERROR),
 }
 
