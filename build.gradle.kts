@@ -1,3 +1,5 @@
+import com.google.protobuf.gradle.id
+
 plugins {
     kotlin("jvm") version "1.9.25"
     kotlin("plugin.spring") version "1.9.25"
@@ -14,6 +16,7 @@ apply(plugin = "org.jetbrains.kotlin.plugin.spring")
 group = "com.park"
 version = "0.0.1-SNAPSHOT"
 val grpcVersion = "1.63.0"
+val protobufVersion = "3.23.4"
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(17)
@@ -33,7 +36,7 @@ repositories {
 }
 
 dependencies {
-    implementation("org.woo:domain-auth:+")
+    implementation("org.woo:domain-auth:0.1.3")
     implementation("org.woo:http:0.1.1")
     implementation("org.woo:mapper:+")
     implementation("org.woo:apm:+")
@@ -104,8 +107,9 @@ dependencies {
 //        exclude(group = "io.grpc", module = "grpc-")
     }
     implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
-    implementation("org.woo:grpc:+")
-
+    implementation("io.grpc:grpc-kotlin-stub:1.4.1")
+    implementation("org.woo:grpc:0.2.1")
+    implementation("org.woo:storage-sdk:0.0.3")
     // kafka
     implementation("org.springframework.kafka:spring-kafka")
     testImplementation("org.springframework.kafka:spring-kafka-test")
@@ -139,5 +143,27 @@ dependencyManagement {
 kapt {
     arguments {
         arg("querydsl.sourceDir", "${project.layout.buildDirectory}/generated/querydsl")
+    }
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:$protobufVersion"
+    }
+    plugins {
+        id("grpc") {
+            artifact = "io.grpc:protoc-gen-grpc-java:$grpcVersion"
+        }
+        id("grpckt") {
+            artifact = "io.grpc:protoc-gen-grpc-kotlin:1.2.0:jdk7@jar"
+        }
+    }
+    generateProtoTasks {
+        ofSourceSet("main").forEach {
+            it.plugins {
+                id("grpc") { }
+                id("grpckt") {}
+            }
+        }
     }
 }

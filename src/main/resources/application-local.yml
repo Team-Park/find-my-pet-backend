@@ -33,3 +33,9 @@ consume:
 
 server:
   port: 8081
+
+platform-holder:
+  application:
+    id: test
+  cdn:
+    domain: http://localhost:8080

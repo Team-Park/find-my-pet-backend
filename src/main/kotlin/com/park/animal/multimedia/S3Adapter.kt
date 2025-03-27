@@ -9,8 +9,7 @@ import kotlinx.coroutines.coroutineScope
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.multipart.MultipartFile
-import java.util.*
-
+import java.util.UUID
 
 @Component
 class S3Adapter(
@@ -19,26 +18,27 @@ class S3Adapter(
     private val cloudFrontDomain: String,
     @Value("\${aws.s3.bucket-name}")
     private val bucketName: String,
-)  {
-    suspend fun uploadFiles(files: List<MultipartFile>): List<String>? {
-        return coroutineScope {
+) {
+    suspend fun uploadFiles(files: List<MultipartFile>): List<String>? =
+        coroutineScope {
             files.map { file ->
-                val metadata = ObjectMetadata().apply {
-                    this.contentType = file.contentType
-                    this.contentLength = file.size
-                }
+                val metadata =
+                    ObjectMetadata().apply {
+                        this.contentType = file.contentType
+                        this.contentLength = file.size
+                    }
                 async {
                     val fileName = UUID.randomUUID().toString()
-                    val putObjectRequest = PutObjectRequest(
-                        bucketName,
-                        fileName,
-                        file.inputStream,
-                        metadata,
-                    )
+                    val putObjectRequest =
+                        PutObjectRequest(
+                            bucketName,
+                            fileName,
+                            file.inputStream,
+                            metadata,
+                        )
                     amazonS3.putObject(putObjectRequest)
                     "$cloudFrontDomain/$fileName"
                 }
             }
         }.awaitAll()
-    }
 }

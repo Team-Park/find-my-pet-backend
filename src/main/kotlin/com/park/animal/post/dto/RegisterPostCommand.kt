@@ -20,4 +20,5 @@ data class RegisterPostCommand(
     val lng: Double,
     val openChatUrl: String?,
     val missingAnimalStatus: MissingAnimalStatus,
+    val applicationId: String,
 )

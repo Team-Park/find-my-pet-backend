@@ -39,8 +39,8 @@ spring:
     multipart:
       enabled: true
       file-size-threshold: 0B
-      max-file-size: 100MB
-      max-request-size: 100MB
+      max-file-size: 200MB
+      max-request-size: 200MB
   kafka:
     bootstrap-servers: ${consume.kafka.bootstrap.server}
     consumer:
@@ -64,8 +64,9 @@ management:
         include: health,info,metrics,prometheus
 
 # custom env
-auth:
-  discovery-host: 'discovery:///${spring.profiles.active}-${AUTH_HOST}'
+discovery-host:
+  auth: 'discovery:///${spring.profiles.active}-${AUTH_NAME}'
+  storage: 'discovery:///${spring.profiles.active}-${STORAGE_NAME}'
 aws:
   s3:
     bucket-name: ${AWS_S3_BUCKET_NAME}
@@ -74,13 +75,23 @@ aws:
 
 cloud-front:
   domain: ${CLOUD_FRONT_DOMAIN_NAME}
+
 grpc:
   client:
     auth:
-      address: ${auth.discovery-host}
+      address: ${discovery-host.auth}
       enableKeepAlive: true
       keepAliveWithoutCalls: true
       negotiationType: plaintext
+    storage:
+      address: ${discovery-host.storage}
+      enable-keep-alive: true
+      keep-alive-without-calls: true
+      negotiation-type: plaintext
+
+platform-holder:
+  cdn:
+    domain: ${PLATFORM_HOLDER_CDN_HOST}
 
 consume:
   kafka:
