@@ -22,7 +22,7 @@ class UploadTestController(
     suspend fun addPostImage(
         @RequestParam image: MultipartFile,
     ): SucceededApiResponseBody<Void> {
-        fileService.imageUpload(image, "test")
+        fileService.imageUpload(image, "test", "test")
         return SucceededApiResponseBody(data = null)
     }
 }
