@@ -45,7 +45,7 @@ class PostService(
                     postRepository.save(post)
                 }
             if (command.images.isNotEmpty()) {
-                val uploadImages = uploadImages(command.images)
+                val uploadImages = uploadImages(command.images, command.userId, command.applicationId)
                 withContext(Dispatchers.IO) {
                     savePostImages(postEntity, uploadImages)
                 }
@@ -53,8 +53,13 @@ class PostService(
         }
     }
 
-    private suspend fun uploadImages(images: List<MultipartFile>): List<String> =
-        multimediaService.uploadMultipartFiles(images) ?: throw ImageUploadException()
+    private suspend fun uploadImages(
+        images: List<MultipartFile>,
+        userId: UUID,
+        applicationId: String,
+    ): List<String> =
+        multimediaService.uploadMultipartFiles(images, userId.toString(), applicationId)
+            ?: throw ImageUploadException()
 
     private suspend fun savePostImages(
         post: Post,
@@ -128,13 +133,14 @@ class PostService(
         images: List<MultipartFile>,
         postId: UUID,
         userId: UUID,
+        applicationId: String,
     ) {
         val postEntity = getPostEntity(postId)
         if (postEntity.authorId != userId) {
             throw BusinessException(ErrorCode.FORBIDDEN)
         }
         runBlocking {
-            val uploadImages = uploadImages(images)
+            val uploadImages = uploadImages(images, userId, applicationId)
             savePostImages(postEntity, uploadImages)
         }
     }

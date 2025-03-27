@@ -119,6 +119,7 @@ class PostController(
                     lng = lng,
                     openChatUrl = openChatUrl,
                     missingAnimalStatus = missingAnimalStatus,
+                    applicationId = userContext.signInApplicationId,
                 )
             } else {
                 RegisterPostCommand(
@@ -136,6 +137,7 @@ class PostController(
                     lng = lng,
                     openChatUrl = openChatUrl,
                     missingAnimalStatus = missingAnimalStatus,
+                    applicationId = userContext.signInApplicationId,
                 )
             }
         postService.registerPost(command)
@@ -158,7 +160,7 @@ class PostController(
         return SucceededApiResponseBody(data = null)
     }
 
-    @PostMapping("/post/image")
+    @PostMapping("/post/image", consumes = ["multipart/form-data", "application/json"])
     @Operation(
         summary = "게시글에 이미지 추가",
         security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
@@ -174,6 +176,7 @@ class PostController(
             images = image,
             postId = postId,
             userId = userContext.getIdIfRequired(),
+            applicationId = userContext.signInApplicationId,
         )
         return SucceededApiResponseBody(data = null)
     }

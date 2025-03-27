@@ -8,12 +8,26 @@ import java.util.concurrent.TimeUnit
 class RedisDriver(
     private val redisTemplate: RedisTemplate<String, Any>,
 ) {
-    fun <T> setValue(key: String, value: T, ttl: Long) {
+    fun <T> setValue(
+        key: String,
+        value: T,
+        ttl: Long,
+    ) {
         redisTemplate.opsForValue().set(key, value!!, ttl, TimeUnit.SECONDS)
     }
 
-    fun <T> getValue(key: String, clazz: Class<T>): T? {
+    fun <T> getValue(
+        key: String,
+        clazz: Class<T>,
+    ): T? {
         val value = redisTemplate.opsForValue().get(key)
         return clazz.cast(value)
+    }
+
+    fun increment(
+        key: String,
+        ttl: Long,
+    ) {
+        redisTemplate.opsForValue().increment(key, 1L)
     }
 }
