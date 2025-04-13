@@ -2,6 +2,10 @@ spring:
   config:
     activate:
       on-profile: local
+  datasource:
+    url: jdbc:mysql://localhost:3306/findmypet?useUnicode=yes&characterEncoding=UTF-8&connectTimeout=2000&autoReconnect=true&serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: 1234
   data:
     mongodb:
       uri: mongodb://root:1234@localhost:27017/post?authSource=admin
