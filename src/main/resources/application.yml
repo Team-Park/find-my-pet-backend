@@ -15,8 +15,8 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${RDBMS_URI:localhost}:3306/findmypet?useUnicode=yes&characterEncoding=UTF-8&connectTimeout=2000&autoReconnect=true&serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true
-    username: ${RDBMS_USERNAME:root}
-    password: ${RDBMS_PASSWORD:1234}
+    username: ${RDBMS_USERNAME}
+    password: ${RDBMS_PASSWORD}
   jpa:
     open-in-view: false
     properties:
