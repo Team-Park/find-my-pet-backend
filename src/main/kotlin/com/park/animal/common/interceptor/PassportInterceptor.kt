@@ -1,7 +1,6 @@
 package com.park.animal.common.interceptor
 
 import annotation.PublicEndPoint
-import com.park.animal.auth.external.AuthGrpcService
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
 import dto.UserContext
@@ -15,9 +14,7 @@ import org.springframework.web.servlet.ModelAndView
 import org.woo.mapper.Jackson
 
 @Component
-class PassportInterceptor(
-    val authGrpcService: AuthGrpcService,
-) : HandlerInterceptor {
+class PassportInterceptor : HandlerInterceptor {
     override fun preHandle(
         request: HttpServletRequest,
         response: HttpServletResponse,

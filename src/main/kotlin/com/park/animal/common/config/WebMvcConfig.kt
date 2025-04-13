@@ -21,9 +21,9 @@ class WebMvcConfig(
     }
 
     override fun addInterceptors(registry: InterceptorRegistry) {
-        registry
-            .addInterceptor(passportInterceptor)
-            .addPathPatterns("/api/**")
+//        registry
+//            .addInterceptor(passportInterceptor)
+//            .addPathPatterns("/api/**")
     }
 
     override fun addCorsMappings(registry: CorsRegistry) {
