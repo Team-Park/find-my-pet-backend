@@ -8,6 +8,7 @@ plugins {
     kotlin("plugin.jpa") version "1.9.25"
     kotlin("kapt") version "1.9.25"
     id("com.google.protobuf") version "0.9.4"
+    id("org.woo.plugin.version-check") version "0.0.8"
 }
 
 apply(plugin = "org.jetbrains.kotlin.plugin.jpa")
