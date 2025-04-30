@@ -58,6 +58,9 @@ eureka:
     prefer-ip-address: false
 
 management:
+  metrics:
+    tags:
+      application: ${spring.application.name}
   endpoints:
     web:
       exposure:
