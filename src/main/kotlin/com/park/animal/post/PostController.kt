@@ -11,7 +11,7 @@ import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
 import com.park.animal.post.dto.UpdatePostRequest
 import com.park.animal.post.entity.MissingAnimalStatus
-import dto.UserContext
+import dto.Passport
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -71,9 +71,9 @@ class PostController(
         @PathVariable id: UUID,
         @AuthenticationUser(isRequired = false)
         @Parameter(hidden = true)
-        userContext: UserContext?,
+        passport: Passport?,
     ): SucceededApiResponseBody<PostDetailResponse> {
-        val response = postService.findDetailPost(id, userContext?.userId)
+        val response = postService.findDetailPost(id, passport?.userId)
         return SucceededApiResponseBody(data = response)
     }
 
@@ -85,7 +85,7 @@ class PostController(
     suspend fun registerPost(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
         @RequestParam title: String,
         @RequestParam phoneNum: String,
         @RequestParam
@@ -103,9 +103,9 @@ class PostController(
         @RequestParam missingAnimalStatus: MissingAnimalStatus,
     ): SucceededApiResponseBody<Void> {
         val command =
-            if (customNickname != null && userContext.role == Role.ROLE_ADMIN) {
+            if (customNickname != null && passport.role == Role.ROLE_ADMIN) {
                 RegisterPostCommand(
-                    userId = userContext.getIdIfRequired(),
+                    userId = passport.userId,
                     userName = customNickname,
                     images = image,
                     title = title,
@@ -119,12 +119,12 @@ class PostController(
                     lng = lng,
                     openChatUrl = openChatUrl,
                     missingAnimalStatus = missingAnimalStatus,
-                    applicationId = userContext.signInApplicationId,
+                    applicationId = passport.signInApplicationId,
                 )
             } else {
                 RegisterPostCommand(
-                    userId = userContext.getIdIfRequired(),
-                    userName = userContext.getNameIfRequired(),
+                    userId = passport.userId,
+                    userName = passport.requireUserContext().userName.toString(),
                     images = image,
                     title = title,
                     phoneNum = phoneNum,
@@ -137,7 +137,7 @@ class PostController(
                     lng = lng,
                     openChatUrl = openChatUrl,
                     missingAnimalStatus = missingAnimalStatus,
-                    applicationId = userContext.signInApplicationId,
+                    applicationId = passport.signInApplicationId,
                 )
             }
         postService.registerPost(command)
@@ -152,11 +152,11 @@ class PostController(
     fun updatePost(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
         @RequestBody
         request: UpdatePostRequest,
     ): SucceededApiResponseBody<Void> {
-        postService.updatePost(command = request, userId = userContext.getIdIfRequired())
+        postService.updatePost(command = request, userId = passport.userId)
         return SucceededApiResponseBody(data = null)
     }
 
@@ -168,15 +168,15 @@ class PostController(
     fun addPostImage(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
         @RequestParam image: List<MultipartFile>,
         @RequestParam postId: UUID,
     ): SucceededApiResponseBody<Void> {
         postService.addPostImage(
             images = image,
             postId = postId,
-            userId = userContext.getIdIfRequired(),
-            applicationId = userContext.signInApplicationId,
+            userId = passport.userId,
+            applicationId = passport.signInApplicationId,
         )
         return SucceededApiResponseBody(data = null)
     }
@@ -189,12 +189,12 @@ class PostController(
     fun deletePostImage(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
         @RequestBody
         request: DeletePostImageRequest,
     ): SucceededApiResponseBody<Void> {
         postService.deletePostImage(
-            userId = userContext.getIdIfRequired(),
+            userId = passport.userId,
             postId = request.postId,
             postImageId = request.postImageId,
         )
@@ -209,10 +209,10 @@ class PostController(
     fun deletePost(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
         @PathVariable id: UUID,
     ): SucceededApiResponseBody<Void> {
-        postService.deletePost(postId = id, userId = userContext.getIdIfRequired())
+        postService.deletePost(postId = id, userId = passport.userId)
         return SucceededApiResponseBody(data = null)
     }
 
@@ -225,9 +225,9 @@ class PostController(
     fun myPage(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
     ): SucceededApiResponseBody<List<PostSummaryResponse>> {
-        val response = postService.myPage(userId = userContext.getIdIfRequired())
+        val response = postService.myPage(userId = passport.userId)
         return SucceededApiResponseBody(data = response)
     }
 
@@ -239,14 +239,14 @@ class PostController(
     fun updateMissingAnimalStatus(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
         @RequestParam("missingAnimalStatus")
         missingAnimalStatus: MissingAnimalStatus,
         @RequestParam("postId")
         postId: UUID,
     ): SucceededApiResponseBody<Unit> {
         postService.updateStatus(
-            userId = userContext.getIdIfRequired(),
+            userId = passport.userId,
             postId = postId,
             status = missingAnimalStatus,
         )

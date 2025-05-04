@@ -1,7 +1,7 @@
 package com.park.animal.common.http.error
 
-import com.park.animal.common.http.error.exception.AuthException
 import com.park.animal.common.http.error.exception.BusinessException
+import exception.AuthException
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.boot.logging.LogLevel
 import org.springframework.http.HttpStatus
@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.woo.apm.log.log
 import org.woo.http.FailedApiResponseBody
+import exception.ErrorCode as AuthErrorCode
+import exception.LogLevel as AuthLogLevel
 
 @RestControllerAdvice
 class GlobalExceptionController {
@@ -38,6 +40,42 @@ class GlobalExceptionController {
     ): ResponseEntity<FailedApiResponseBody> {
         outputLog(errorCode = ErrorCode.UNKNOWN_ERROR, e = e, path = request.requestURI)
         return e.toFailedBody()
+    }
+
+    private fun outputLog(
+        errorCode: AuthErrorCode,
+        e: AuthException,
+        path: String,
+    ) {
+        when (errorCode.level) {
+            AuthLogLevel.ERROR -> {
+                log().error(
+                    """
+                    errorCode = ${errorCode.name}
+                    message = ${errorCode.message}
+                    requestPath = $path
+                    stackTrace = ${e.printStackTrace()}
+                    cause = ${e.cause}
+                    message = ${e.message}
+                    """.trimIndent(),
+                )
+            }
+
+            AuthLogLevel.WARN -> {
+                log().warn(
+                    """
+                    errorCode = ${errorCode.name}
+                    message = ${errorCode.message}
+                    requestPath = $path
+                    stackTrace = ${e.cause?.printStackTrace()}
+                    cause = ${e.cause}
+                    message = ${e.message}
+                    """.trimIndent(),
+                )
+            }
+
+            else -> {}
+        }
     }
 
     private fun outputLog(
@@ -83,8 +121,12 @@ fun BusinessException.toFailedBody(): ResponseEntity<FailedApiResponseBody> {
 }
 
 fun AuthException.toFailedBody(): ResponseEntity<FailedApiResponseBody> {
-    val failedApiResponseBody = this.errorCode.toFailedResponseBody()
-    return ResponseEntity.status(this.errorCode.httpCode.value()).body(failedApiResponseBody)
+    val failedApiResponseBody =
+        FailedApiResponseBody(
+            code = errorCode.name,
+            message = errorCode.message,
+        )
+    return ResponseEntity.status(this.errorCode.httpCode).body(failedApiResponseBody)
 }
 
 fun Exception.toFailedBody(): ResponseEntity<FailedApiResponseBody> {

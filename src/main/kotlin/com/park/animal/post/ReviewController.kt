@@ -8,7 +8,7 @@ import com.park.animal.post.dto.RegisterReviewRequest
 import com.park.animal.post.dto.ReviewDetailResponseDto
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
 import com.park.animal.post.dto.SummaryReviewResponse
-import dto.UserContext
+import dto.Passport
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -36,13 +36,13 @@ class ReviewController(
     fun registerReview(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
         @RequestBody
         request: RegisterReviewRequest,
     ): SucceededApiResponseBody<Unit> {
         reviewService.registerReview(
-            userId = userContext.getIdIfRequired().toString(),
-            authorName = userContext.getNameIfRequired(),
+            userId = passport.userId.toString(),
+            authorName = passport.requireUserContext().userName.toString(),
             title = request.title,
             content = request.content,
             categoryId = request.categoryId,
@@ -81,10 +81,10 @@ class ReviewController(
     fun getReview(
         @AuthenticationUser(isRequired = false)
         @Parameter(hidden = true)
-        userContext: UserContext?,
+        passport: Passport?,
         @PathVariable("id") id: String,
     ): SucceededApiResponseBody<ReviewDetailResponseDto> {
-        val response = reviewService.getDetail(id, userContext?.userId)
+        val response = reviewService.getDetail(id, passport?.userId)
         return SucceededApiResponseBody(data = response)
     }
 }
