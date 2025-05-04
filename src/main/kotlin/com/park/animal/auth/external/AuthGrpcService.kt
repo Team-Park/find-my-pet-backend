@@ -30,7 +30,6 @@ class AuthGrpcService {
                 log().error(exception.stackTraceToString())
                 continuation.resumeWithException(exception)
             }.onSuccess { response ->
-                log().info("grpc response = ${response.id}")
                 continuation.resume(response)
             }
         }

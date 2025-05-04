@@ -10,7 +10,7 @@ data class UserInfoResponse(
     companion object {
         fun fromProto(userInfoResponse: AuthProto.UserInfoResponse) =
             UserInfoResponse(
-                role = userInfoResponse.role,
+                role = userInfoResponse.applicationRole,
                 email = userInfoResponse.email,
                 name = userInfoResponse.name,
             )

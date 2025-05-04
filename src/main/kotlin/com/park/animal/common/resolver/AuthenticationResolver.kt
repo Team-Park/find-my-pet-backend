@@ -1,10 +1,14 @@
 package com.park.animal.common.resolver
 
 import annotation.AuthenticationUser
+import com.park.animal.auth.external.AuthGrpcService
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
+import constant.AuthConstant
+import dto.Passport
 import dto.UserContext
 import jakarta.servlet.http.HttpServletRequest
+import kotlinx.coroutines.runBlocking
 import org.springframework.core.MethodParameter
 import org.springframework.stereotype.Component
 import org.springframework.web.bind.support.WebDataBinderFactory
@@ -14,7 +18,9 @@ import org.springframework.web.method.support.ModelAndViewContainer
 import org.woo.mapper.Jackson
 
 @Component
-class AuthenticationResolver : HandlerMethodArgumentResolver {
+class AuthenticationResolver(
+    private val authGrpcService: AuthGrpcService,
+) : HandlerMethodArgumentResolver {
     override fun supportsParameter(parameter: MethodParameter): Boolean = true
 
     override fun resolveArgument(
@@ -29,6 +35,20 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
         val shouldAuthenticate = shouldAuthenticate(parameter)
         return runCatching {
             val passport = request.getPassport()
+            if (hasAuthenticationUserAnnotation(parameter) && passport != null) {
+                runBlocking {
+                    val token = request.getHeader(AuthConstant.AUTHORIZATION_HEADER)
+                    passport.ensureUserContextLoaded {
+                        val userInfo = authGrpcService.getUserInfo(token)
+                        UserContext(
+                            email = userInfo.email,
+                            userName = userInfo.name,
+                            applicationRole = userInfo.applicationRole,
+                            accessLevel = userInfo.accessLevel,
+                        )
+                    }
+                }
+            }
             return passport
         }.onFailure {
             if (shouldAuthenticate) {
@@ -39,12 +59,15 @@ class AuthenticationResolver : HandlerMethodArgumentResolver {
 
     private fun shouldAuthenticate(parameter: MethodParameter): Boolean =
         parameter.getParameterAnnotation(AuthenticationUser::class.java)?.isRequired ?: false
+
+    private fun hasAuthenticationUserAnnotation(parameter: MethodParameter): Boolean =
+        parameter.hasParameterAnnotation(AuthenticationUser::class.java)
 }
 
-fun HttpServletRequest.getPassport(): UserContext? {
+fun HttpServletRequest.getPassport(): Passport? {
     val passportString = this.getHeader("X-User-Passport")
     if (passportString.isNullOrBlank()) {
         return null
     }
-    return Jackson.readValue(passportString, UserContext::class.java)
+    return Jackson.readValue(passportString, Passport::class.java)
 }

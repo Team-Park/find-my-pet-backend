@@ -37,10 +37,10 @@ repositories {
 }
 
 dependencies {
-    implementation("org.woo:domain-auth:0.1.4")
+    implementation("org.woo:domain-auth:0.2.2")
     implementation("org.woo:http:0.1.1")
-    implementation("org.woo:mapper:+")
-    implementation("org.woo:apm:+")
+    implementation("org.woo:mapper:0.0.2")
+    implementation("org.woo:apm:0.2.3")
 
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
@@ -109,8 +109,8 @@ dependencies {
     }
     implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:1.4.1")
-    implementation("org.woo:grpc:0.2.4")
-    implementation("org.woo:storage-sdk:0.0.3")
+    implementation("org.woo:grpc:0.3.0")
+    implementation("org.woo:storage-sdk:0.0.5")
     // kafka
     implementation("org.springframework.kafka:spring-kafka")
     testImplementation("org.springframework.kafka:spring-kafka-test")

@@ -2,7 +2,7 @@ package com.park.animal.user
 
 import annotation.AuthenticationUser
 import com.park.animal.common.config.SwaggerConfig
-import dto.UserContext
+import dto.Passport
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
@@ -22,13 +22,13 @@ class UserController {
     suspend fun me(
         @AuthenticationUser
         @Parameter(hidden = true)
-        userContext: UserContext,
+        passport: Passport,
     ): SucceededApiResponseBody<UserInfoResponse> {
         val response =
             UserInfoResponse(
-                email = userContext.getEmailIfRequired(),
-                role = userContext.getRoleIfRequired().name,
-                name = userContext.getNameIfRequired(),
+                email = passport.requireUserContext().email.toString(),
+                role = passport.requireUserContext().applicationRole,
+                name = passport.requireUserContext().userName.toString(),
             )
 
         return SucceededApiResponseBody(response)
