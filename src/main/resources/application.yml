@@ -13,6 +13,12 @@ spring:
       host: ${REDIS_HOST}
       password: ${REDIS_PASSWORD}
   datasource:
+    hikari:
+      max-lifetime: 1800000 # 30 분
+      idle-timeout: 600000 # 10 분
+      minimum-idle: 10
+      maximum-pool-size: 20
+      connection-test-query: SELECT 1
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://${RDBMS_URI:localhost}:3306/findmypet?useUnicode=yes&characterEncoding=UTF-8&connectTimeout=2000&autoReconnect=true&serverTimezone=Asia/Seoul&useSSL=false&allowPublicKeyRetrieval=true
     username: ${RDBMS_USERNAME}
