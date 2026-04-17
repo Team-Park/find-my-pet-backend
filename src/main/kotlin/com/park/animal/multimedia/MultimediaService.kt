@@ -10,7 +10,6 @@ import org.woo.storagesdk.UploadClient
 
 @Service
 class MultimediaService(
-    private val s3Adapter: S3Adapter,
     private val client: UploadClient,
     @Value("\${platform-holder.cdn.domain}")
     private val myCdnUrl: String,
@@ -34,7 +33,7 @@ class MultimediaService(
             data = file.inputStream,
         )
 
-    private suspend fun generateImageUrl(fileId: Long): String = "$myCdnUrl$CDN_PATH/$fileId"
+    private fun generateImageUrl(fileId: Long): String = "$myCdnUrl$CDN_PATH/$fileId"
 
     suspend fun uploadMultipartFiles(
         files: List<MultipartFile>,
@@ -50,9 +49,4 @@ class MultimediaService(
                     }
                 }.awaitAll()
         }
-
-    suspend fun uploadMultipartFile(file: MultipartFile): String? {
-        val command = listOf(file)
-        return s3Adapter.uploadFiles(command)?.get(0)
-    }
 }
