@@ -7,6 +7,7 @@ import com.park.animal.common.config.SwaggerConfig
 import com.park.animal.common.constants.OrderBy
 import com.park.animal.post.dto.DeletePostImageRequest
 import com.park.animal.post.dto.PostDetailResponse
+import com.park.animal.post.dto.PostNearbyResponse
 import com.park.animal.post.dto.PostSummaryResponse
 import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
@@ -62,6 +63,30 @@ class PostController(
                     contents = response.result,
                     hasNextPage = response.hasNextPage,
                     totalCount = response.totalCount,
+                ),
+        )
+    }
+
+    @GetMapping("/posts/nearby")
+    @PublicEndPoint
+    @Operation(
+        summary = "반경 내 게시글 조회",
+        description = "중심 좌표(lat, lng)와 radiusKm 반경 안의 실종 게시글을 가까운 순으로 페이지네이션 조회 (Haversine).",
+    )
+    fun getPostsNearby(
+        @RequestParam("lat") lat: Double,
+        @RequestParam("lng") lng: Double,
+        @RequestParam("radiusKm", required = false, defaultValue = "5") radiusKm: Double,
+        @RequestParam("pageSize", required = false, defaultValue = "20") size: Long,
+        @RequestParam("pageOffset", required = false, defaultValue = "0") offset: Long,
+    ): PaginatedApiResponseBody<PostNearbyResponse> {
+        val page = postService.findNearbyPosts(lat, lng, radiusKm, size, offset)
+        return PaginatedApiResponseBody(
+            data =
+                PaginatedApiResponseDto(
+                    contents = page.contents,
+                    hasNextPage = page.hasNextPage,
+                    totalCount = page.totalCount,
                 ),
         )
     }

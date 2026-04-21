@@ -7,6 +7,7 @@ import com.park.animal.common.http.error.exception.BusinessException
 import com.park.animal.common.http.error.exception.ImageUploadException
 import com.park.animal.multimedia.MultimediaService
 import com.park.animal.post.dto.PostDetailResponse
+import com.park.animal.post.dto.PostNearbyResponse
 import com.park.animal.post.dto.PostSummaryResponse
 import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageDto
@@ -16,6 +17,7 @@ import com.park.animal.post.entity.MissingAnimalStatus
 import com.park.animal.post.entity.Post
 import com.park.animal.post.entity.PostImage
 import com.park.animal.post.repository.PostImageRepository
+import com.park.animal.post.repository.PostNearbyRepository
 import com.park.animal.post.repository.PostRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -34,6 +36,7 @@ class PostService(
     private val multimediaService: MultimediaService,
     private val postImageRepository: PostImageRepository,
     private val breedRepository: BreedRepository,
+    private val postNearbyRepository: PostNearbyRepository,
 ) {
     companion object {
         const val CANCEL_USER_NAME = "탈퇴한 사용자"
@@ -108,6 +111,26 @@ class PostService(
             orderBy = query.orderBy,
             page = query.offset,
         )
+
+    @Transactional(readOnly = true)
+    fun findNearbyPosts(
+        lat: Double,
+        lng: Double,
+        radiusKm: Double,
+        size: Long,
+        offset: Long,
+    ): NearbyPostsPage {
+        val contents = postNearbyRepository.findNearby(lat, lng, radiusKm, size, offset)
+        val totalCount = postNearbyRepository.countNearby(lat, lng, radiusKm)
+        val hasNextPage = totalCount > (offset + contents.size)
+        return NearbyPostsPage(contents = contents, hasNextPage = hasNextPage, totalCount = totalCount)
+    }
+
+    data class NearbyPostsPage(
+        val contents: List<PostNearbyResponse>,
+        val hasNextPage: Boolean,
+        val totalCount: Long,
+    )
 
     @Transactional
     fun deletePost(
