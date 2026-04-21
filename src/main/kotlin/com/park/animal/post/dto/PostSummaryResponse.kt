@@ -1,5 +1,6 @@
 package com.park.animal.post.dto
 
+import com.park.animal.breed.entity.AnimalType
 import com.park.animal.post.entity.MissingAnimalStatus
 import java.time.LocalDateTime
 import java.util.UUID
@@ -14,4 +15,6 @@ data class PostSummaryResponse(
     val time: LocalDateTime,
     val thumbnail: String?,
     val missingAnimalStatus: MissingAnimalStatus,
+    val animalType: AnimalType,
+    val breedId: UUID?,
 )

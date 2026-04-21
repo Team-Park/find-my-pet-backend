@@ -89,6 +89,8 @@ class PostQueryRepositoryImpl(
                     ),
                     post.openChatUrl,
                     post.missingAnimalStatus,
+                    post.animalType,
+                    post.breedId,
                     isMine(userId),
                 ),
             ).from(post)
@@ -164,6 +166,8 @@ class PostQueryRepositoryImpl(
                     post.time,
                     postImage.imageUrl,
                     post.missingAnimalStatus,
+                    post.animalType,
+                    post.breedId,
                 ),
             ).from(post)
             .leftJoin(postImage)

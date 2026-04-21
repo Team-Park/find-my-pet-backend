@@ -1,5 +1,6 @@
 package com.park.animal.post.entity
 
+import com.park.animal.breed.entity.AnimalType
 import com.park.animal.common.persistence.BaseEntity
 import com.park.animal.post.dto.RegisterPostCommand
 import jakarta.persistence.Column
@@ -46,6 +47,12 @@ class Post(
     @Enumerated(STRING)
     @Column(name = "missing_animal_status")
     var missingAnimalStatus: MissingAnimalStatus,
+    @Enumerated(STRING)
+    @Column(name = "animal_type", nullable = false)
+    var animalType: AnimalType = AnimalType.DOG,
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "breed_id")
+    var breedId: UUID? = null,
 ) : BaseEntity() {
     companion object {
         fun createPostFromCommand(command: RegisterPostCommand): Post =
@@ -63,6 +70,8 @@ class Post(
                 lng = command.lng,
                 openChatUrl = command.openChatUrl,
                 missingAnimalStatus = command.missingAnimalStatus,
+                animalType = command.animalType,
+                breedId = command.breedId,
             )
     }
 
@@ -78,6 +87,8 @@ class Post(
         lng: Double,
         openChatUrl: String?,
         missingAnimalStatus: MissingAnimalStatus,
+        animalType: AnimalType,
+        breedId: UUID?,
     ) {
         this.gender = gender
         this.time = time
@@ -90,6 +101,8 @@ class Post(
         this.lng = lng
         this.openChatUrl = openChatUrl
         this.missingAnimalStatus = missingAnimalStatus
+        this.animalType = animalType
+        this.breedId = breedId
     }
 
     fun updateStatus(renewalStatus: MissingAnimalStatus) {

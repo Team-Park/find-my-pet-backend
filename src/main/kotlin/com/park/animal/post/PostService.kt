@@ -1,5 +1,7 @@
 package com.park.animal.post
 
+import com.park.animal.breed.entity.AnimalType
+import com.park.animal.breed.repository.BreedRepository
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
 import com.park.animal.common.http.error.exception.ImageUploadException
@@ -31,6 +33,7 @@ class PostService(
     private val postRepository: PostRepository,
     private val multimediaService: MultimediaService,
     private val postImageRepository: PostImageRepository,
+    private val breedRepository: BreedRepository,
 ) {
     companion object {
         const val CANCEL_USER_NAME = "탈퇴한 사용자"
@@ -38,6 +41,7 @@ class PostService(
 
     @Transactional
     suspend fun registerPost(command: RegisterPostCommand) {
+        validateBreed(command.animalType, command.breedId)
         coroutineScope {
             val post = Post.createPostFromCommand(command)
             val postEntity =
@@ -50,6 +54,20 @@ class PostService(
                     savePostImages(postEntity, uploadImages)
                 }
             }
+        }
+    }
+
+    private fun validateBreed(
+        animalType: AnimalType,
+        breedId: UUID?,
+    ) {
+        if (breedId == null) return
+        val breed =
+            breedRepository
+                .findById(breedId)
+                .orElseThrow { BusinessException(ErrorCode.NOT_FOUND_BREED) }
+        if (breed.animalType != animalType) {
+            throw BusinessException(ErrorCode.MISMATCHED_BREED)
         }
     }
 
@@ -113,6 +131,7 @@ class PostService(
         if (post.authorId != userId) {
             throw BusinessException(ErrorCode.FORBIDDEN)
         }
+        validateBreed(command.animalType, command.breedId)
         post.update(
             title = command.title,
             description = command.description,
@@ -125,6 +144,8 @@ class PostService(
             lng = command.lng,
             openChatUrl = command.openChatUrl,
             missingAnimalStatus = command.missingAnimalStatus,
+            animalType = command.animalType,
+            breedId = command.breedId,
         )
     }
 

@@ -1,7 +1,9 @@
 package com.park.animal.post.dto
 
+import com.park.animal.breed.entity.AnimalType
 import com.park.animal.post.entity.MissingAnimalStatus
 import java.time.LocalDateTime
+import java.util.UUID
 
 data class PostDetailResponse(
     val author: String,
@@ -15,6 +17,8 @@ data class PostDetailResponse(
     val coordinate: Coordinate,
     val openChatUrl: String?,
     val missingAnimalStatus: MissingAnimalStatus,
+    val animalType: AnimalType,
+    val breedId: UUID?,
     var isMine: Boolean,
 ) {
     lateinit var imageUrls: List<PostImageResponse>
@@ -31,6 +35,8 @@ data class PostDetailResponse(
         coordinate: Coordinate,
         openChatUrl: String?,
         missingAnimalStatus: MissingAnimalStatus,
+        animalType: AnimalType,
+        breedId: UUID?,
         isMineInt: Int,
     ) : this(
         name,
@@ -44,6 +50,8 @@ data class PostDetailResponse(
         coordinate,
         openChatUrl,
         missingAnimalStatus,
+        animalType,
+        breedId,
         isMineInt == 1,
     )
 }

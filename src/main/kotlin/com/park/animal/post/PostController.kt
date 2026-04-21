@@ -2,6 +2,7 @@ package com.park.animal.post
 
 import annotation.AuthenticationUser
 import annotation.PublicEndPoint
+import com.park.animal.breed.entity.AnimalType
 import com.park.animal.common.config.SwaggerConfig
 import com.park.animal.common.constants.OrderBy
 import com.park.animal.post.dto.DeletePostImageRequest
@@ -101,45 +102,35 @@ class PostController(
         @RequestParam openChatUrl: String?,
         @RequestParam(required = false) customNickname: String?,
         @RequestParam missingAnimalStatus: MissingAnimalStatus,
+        @RequestParam(required = false, defaultValue = "DOG") animalType: AnimalType,
+        @RequestParam(required = false) breedId: UUID?,
     ): SucceededApiResponseBody<Void> {
-        val command =
+        val resolvedUserName =
             if (customNickname != null && passport.role == Role.ROLE_ADMIN) {
-                RegisterPostCommand(
-                    userId = passport.userId,
-                    userName = customNickname,
-                    images = image,
-                    title = title,
-                    phoneNum = phoneNum,
-                    time = time,
-                    place = place,
-                    gender = gender,
-                    gratuity = gratuity,
-                    description = description,
-                    lat = lat,
-                    lng = lng,
-                    openChatUrl = openChatUrl,
-                    missingAnimalStatus = missingAnimalStatus,
-                    applicationId = passport.signInApplicationId,
-                )
+                customNickname
             } else {
-                RegisterPostCommand(
-                    userId = passport.userId,
-                    userName = passport.requireUserContext().userName.toString(),
-                    images = image,
-                    title = title,
-                    phoneNum = phoneNum,
-                    time = time,
-                    place = place,
-                    gender = gender,
-                    gratuity = gratuity,
-                    description = description,
-                    lat = lat,
-                    lng = lng,
-                    openChatUrl = openChatUrl,
-                    missingAnimalStatus = missingAnimalStatus,
-                    applicationId = passport.signInApplicationId,
-                )
+                passport.requireUserContext().userName.toString()
             }
+        val command =
+            RegisterPostCommand(
+                userId = passport.userId,
+                userName = resolvedUserName,
+                images = image,
+                title = title,
+                phoneNum = phoneNum,
+                time = time,
+                place = place,
+                gender = gender,
+                gratuity = gratuity,
+                description = description,
+                lat = lat,
+                lng = lng,
+                openChatUrl = openChatUrl,
+                missingAnimalStatus = missingAnimalStatus,
+                animalType = animalType,
+                breedId = breedId,
+                applicationId = passport.signInApplicationId,
+            )
         postService.registerPost(command)
         return SucceededApiResponseBody(data = null)
     }
