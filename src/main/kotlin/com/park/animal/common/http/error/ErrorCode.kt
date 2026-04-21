@@ -41,6 +41,9 @@ enum class ErrorCode(
     // flyer
     NOT_FOUND_FLYER("전단지를 찾을 수 없습니다", HttpStatus.BAD_REQUEST, WARN),
 
+    // sighting
+    NOT_FOUND_SIGHTING("목격 제보를 찾을 수 없습니다", HttpStatus.BAD_REQUEST, WARN),
+
     UNKNOWN_ERROR("알 수 없는 에러", HttpStatus.INTERNAL_SERVER_ERROR, ERROR),
 }
 
