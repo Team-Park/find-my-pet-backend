@@ -34,6 +34,13 @@ enum class ErrorCode(
     // review
     NOT_FOUND_REVIEW("리뷰 상세조회 실패", HttpStatus.BAD_REQUEST, WARN),
 
+    // breed
+    NOT_FOUND_BREED("품종을 찾을 수 없습니다", HttpStatus.BAD_REQUEST, WARN),
+    MISMATCHED_BREED("선택한 동물 종과 품종이 일치하지 않습니다", HttpStatus.BAD_REQUEST, WARN),
+
+    // flyer
+    NOT_FOUND_FLYER("전단지를 찾을 수 없습니다", HttpStatus.BAD_REQUEST, WARN),
+
     UNKNOWN_ERROR("알 수 없는 에러", HttpStatus.INTERNAL_SERVER_ERROR, ERROR),
 }
 
