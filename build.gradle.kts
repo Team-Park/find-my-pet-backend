@@ -106,8 +106,8 @@ dependencies {
     }
     implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
     implementation("io.grpc:grpc-kotlin-stub:1.4.1")
-    implementation("org.woo:grpc:0.3.0")
-    implementation("org.woo:storage-sdk:0.0.5")
+    implementation("org.woo:grpc:0.7.6")
+    implementation("org.woo:storage-sdk:0.2.0")
     // kafka
     implementation("org.springframework.kafka:spring-kafka")
     testImplementation("org.springframework.kafka:spring-kafka-test")

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.woo.apm.log.log
 import org.woo.http.FailedApiResponseBody
+import org.woo.storagesdk.exception.NotAllowedMimeTypeException
 import exception.ErrorCode as AuthErrorCode
 import exception.LogLevel as AuthLogLevel
 
@@ -31,6 +32,16 @@ class GlobalExceptionController {
     ): ResponseEntity<FailedApiResponseBody> {
         outputLog(errorCode = e.errorCode, e = e, path = request.requestURI)
         return e.toFailedBody()
+    }
+
+    @ExceptionHandler(NotAllowedMimeTypeException::class)
+    fun notAllowedFileType(
+        e: NotAllowedMimeTypeException,
+        request: HttpServletRequest,
+    ): ResponseEntity<FailedApiResponseBody> {
+        val code = ErrorCode.NOT_ALLOWED_FILE_TYPE
+        outputLog(errorCode = code, e = e, path = request.requestURI)
+        return ResponseEntity.status(code.httpCode).body(code.toFailedResponseBody())
     }
 
     @ExceptionHandler(Exception::class)

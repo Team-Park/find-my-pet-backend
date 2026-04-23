@@ -6,11 +6,12 @@ import kotlinx.coroutines.coroutineScope
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.web.multipart.MultipartFile
-import org.woo.storagesdk.UploadClient
+import org.woo.storagesdk.usecase.StorageClient
+import org.woo.storagesdk.usecase.StorageClient.Companion.PUBLIC_ACCESS_LEVEL
 
 @Service
 class MultimediaService(
-    private val client: UploadClient,
+    private val client: StorageClient,
     @Value("\${platform-holder.cdn.domain}")
     private val myCdnUrl: String,
 ) {
@@ -31,6 +32,7 @@ class MultimediaService(
             chunkSize = UPLOAD_CHUNK_SIZE,
             applicationId = applicationId,
             data = file.inputStream,
+            accessLevel = PUBLIC_ACCESS_LEVEL,
         )
 
     private fun generateImageUrl(fileId: Long): String = "$myCdnUrl$CDN_PATH/$fileId"

@@ -30,6 +30,7 @@ enum class ErrorCode(
     NOT_FOUND_POST("게시글 상세조회 실패", HttpStatus.BAD_REQUEST, WARN),
     FAILURE_UPLOAD_IMAGE("이미지 업로드하는데 실패했습니다.", HttpStatus.INTERNAL_SERVER_ERROR, ERROR),
     NOT_FOUND_POST_IMAGE("게시글 이미지 조회 실패", HttpStatus.BAD_REQUEST, WARN),
+    NOT_ALLOWED_FILE_TYPE("허용되지 않는 파일 형식입니다. 이미지(.jpg/.jpeg/.png/.gif)만 업로드할 수 있습니다.", HttpStatus.BAD_REQUEST, WARN),
 
     // review
     NOT_FOUND_REVIEW("리뷰 상세조회 실패", HttpStatus.BAD_REQUEST, WARN),
