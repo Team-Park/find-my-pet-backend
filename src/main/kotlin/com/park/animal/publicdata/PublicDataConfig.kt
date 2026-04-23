@@ -21,12 +21,18 @@ class PublicDataConfig {
     fun publicDataApiKey(
         @Value("\${PUBLIC_DATA_API_KEY:}") direct: String,
         @Value("\${PUBLIC_DATA_API_KEY_FILE:}") keyFile: String,
-    ): String =
-        when {
-            direct.isNotBlank() -> direct
-            keyFile.isNotBlank() -> File(keyFile).readText().trim()
-            else -> error("PUBLIC_DATA_API_KEY or PUBLIC_DATA_API_KEY_FILE must be configured")
+    ): String {
+        val resolved =
+            when {
+                direct.isNotBlank() -> direct
+                keyFile.isNotBlank() && File(keyFile).exists() -> File(keyFile).readText().trim()
+                else -> ""
+            }
+        if (resolved.isBlank()) {
+            println("[fmp:publicdata] WARN: PUBLIC_DATA_API_KEY not configured — /abandoned-animals will fail")
         }
+        return resolved
+    }
 
     @Bean(name = ["publicDataWebClient"])
     fun publicDataWebClient(): WebClient =
