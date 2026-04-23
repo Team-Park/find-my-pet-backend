@@ -29,6 +29,10 @@ spring:
       hibernate:
         default_batch_fetch_size: 1000
         dialect: org.hibernate.dialect.MySQLDialect
+        # Hibernate 6 은 MySQL 에서 기본적으로 enum → native ENUM 컬럼을 기대한다.
+        # 우리 마이그레이션은 VARCHAR 를 사용하므로 호환 위해 VARCHAR 로 고정.
+        type:
+          preferred_enum_jdbc_type: VARCHAR
     show-sql: true
     hibernate:
       # 추후 flyway 등 전환 고려
