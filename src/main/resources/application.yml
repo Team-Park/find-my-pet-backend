@@ -35,8 +35,9 @@ spring:
           preferred_enum_jdbc_type: VARCHAR
     show-sql: true
     hibernate:
-      # 추후 flyway 등 전환 고려
-      ddl-auto: validate
+      # Flyway 가 스키마 소유. Hibernate 6 의 enum ↔ VARCHAR 매핑 불일치로
+      # validate 는 false-positive 가 많아 none 으로 고정.
+      ddl-auto: none
   flyway:
     enabled: true
     baseline-on-migrate: true
