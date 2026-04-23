@@ -1,5 +1,6 @@
 package com.park.animal.publicdata
 
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -10,6 +11,7 @@ import java.io.File
 class PublicDataConfig {
     companion object {
         const val BASE_URL = "http://apis.data.go.kr/1543061/abandonmentPublicSrvc"
+        private val log = LoggerFactory.getLogger(PublicDataConfig::class.java)
     }
 
     /**
@@ -29,7 +31,7 @@ class PublicDataConfig {
                 else -> ""
             }
         if (resolved.isBlank()) {
-            println("[fmp:publicdata] WARN: PUBLIC_DATA_API_KEY not configured — /abandoned-animals will fail")
+            log.warn("PUBLIC_DATA_API_KEY not configured — /abandoned-animals will fail (direct=blank, keyFile='{}')", keyFile)
         }
         return resolved
     }
