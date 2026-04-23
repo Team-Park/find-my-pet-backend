@@ -31,9 +31,11 @@ class FlyerLocation(
     @Column(name = "note")
     var note: String? = null,
     @Enumerated(STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "status", nullable = false)
     var status: FlyerStatus = FlyerStatus.POSTED,
     @Enumerated(STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "visibility", nullable = false)
     var visibility: FlyerVisibility = FlyerVisibility.PRIVATE,
     @Column(name = "posted_at", nullable = false)

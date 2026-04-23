@@ -24,6 +24,7 @@ class Breed(
     @JdbcTypeCode(SqlTypes.VARCHAR)
     val id: UUID = Generators.timeBasedEpochGenerator().generate(),
     @Enumerated(STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "animal_type", nullable = false)
     val animalType: AnimalType,
     @Column(name = "name_ko", nullable = false)
@@ -31,11 +32,13 @@ class Breed(
     @Column(name = "name_en")
     val nameEn: String?,
     @Enumerated(STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "size_category", nullable = false)
     val sizeCategory: SizeCategory,
     @Column(name = "base_speed_kmh")
     val baseSpeedKmh: Double?,
     @Enumerated(STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "behavior_pattern", nullable = false)
     val behaviorPattern: BehaviorPattern,
     @Column(name = "explore_factor", nullable = false)

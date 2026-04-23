@@ -45,9 +45,11 @@ class Post(
     @Column(name = "open_chat_url", nullable = true)
     var openChatUrl: String?,
     @Enumerated(STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "missing_animal_status")
     var missingAnimalStatus: MissingAnimalStatus,
     @Enumerated(STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "animal_type", nullable = false)
     var animalType: AnimalType = AnimalType.DOG,
     @JdbcTypeCode(SqlTypes.VARCHAR)
