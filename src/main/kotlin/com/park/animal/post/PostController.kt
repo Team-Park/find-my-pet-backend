@@ -45,7 +45,7 @@ class PostController(
     @Operation(
         summary = "게시글 페이지네이션 조회",
     )
-    fun getPosts(
+    suspend fun getPosts(
         @RequestParam(name = "pageSize", required = false, defaultValue = "20") size: Long,
         @RequestParam(name = "pageOffset", required = false, defaultValue = "0") offset: Long,
         @RequestParam(name = "orderBy", required = false, defaultValue = "CREATED_AT_DESC") orderBy: OrderBy,
@@ -73,7 +73,7 @@ class PostController(
         summary = "반경 내 게시글 조회",
         description = "중심 좌표(lat, lng)와 radiusKm 반경 안의 실종 게시글을 가까운 순으로 페이지네이션 조회 (Haversine).",
     )
-    fun getPostsNearby(
+    suspend fun getPostsNearby(
         @RequestParam("lat") lat: Double,
         @RequestParam("lng") lng: Double,
         @RequestParam("radiusKm", required = false, defaultValue = "5") radiusKm: Double,
@@ -93,7 +93,7 @@ class PostController(
 
     @GetMapping("/post/{id}")
     @PublicEndPoint
-    fun getPost(
+    suspend fun getPost(
         @PathVariable id: UUID,
         @AuthenticationUser(isRequired = false)
         @Parameter(hidden = true)
@@ -238,7 +238,7 @@ class PostController(
         description = "현재는 게시글만 조회합니다",
         security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
     )
-    fun myPage(
+    suspend fun myPage(
         @AuthenticationUser
         @Parameter(hidden = true)
         passport: Passport,

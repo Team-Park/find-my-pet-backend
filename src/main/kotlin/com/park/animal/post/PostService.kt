@@ -96,34 +96,61 @@ class PostService(
         }
     }
 
-    @Transactional(readOnly = true)
-    fun findDetailPost(
+    suspend fun findDetailPost(
         id: UUID,
         userId: UUID?,
-    ): PostDetailResponse =
-        postRepository.findPostDetailWithImages(id, userId)
-            ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
+    ): PostDetailResponse {
+        val detail =
+            withContext(Dispatchers.IO) {
+                postRepository.findPostDetailWithImages(id, userId)
+            } ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
+        val resolved = multimediaService.resolvePresignedUrls(detail.imageUrls.map { it.image })
+        detail.imageUrls =
+            detail.imageUrls.mapIndexed { idx, item ->
+                item.copy(image = resolved[idx])
+            }
+        return detail
+    }
 
-    @Transactional(readOnly = true)
-    fun findPostList(query: SummarizedPostsByPageQuery): SummarizedPostsByPageDto =
-        postRepository.findSummarizedPostsByPage(
-            size = query.size,
-            orderBy = query.orderBy,
-            page = query.offset,
-        )
+    suspend fun findPostList(query: SummarizedPostsByPageQuery): SummarizedPostsByPageDto {
+        val page =
+            withContext(Dispatchers.IO) {
+                postRepository.findSummarizedPostsByPage(
+                    size = query.size,
+                    orderBy = query.orderBy,
+                    page = query.offset,
+                )
+            }
+        val resolved = multimediaService.resolvePresignedUrls(page.result.map { it.thumbnail ?: "" })
+        val newContents =
+            page.result.mapIndexed { idx, item ->
+                if (item.thumbnail.isNullOrBlank()) item else item.copy(thumbnail = resolved[idx])
+            }
+        return page.copy(result = newContents)
+    }
 
-    @Transactional(readOnly = true)
-    fun findNearbyPosts(
+    suspend fun findNearbyPosts(
         lat: Double,
         lng: Double,
         radiusKm: Double,
         size: Long,
         offset: Long,
     ): NearbyPostsPage {
-        val contents = postNearbyRepository.findNearby(lat, lng, radiusKm, size, offset)
-        val totalCount = postNearbyRepository.countNearby(lat, lng, radiusKm)
+        val contents =
+            withContext(Dispatchers.IO) {
+                postNearbyRepository.findNearby(lat, lng, radiusKm, size, offset)
+            }
+        val totalCount =
+            withContext(Dispatchers.IO) {
+                postNearbyRepository.countNearby(lat, lng, radiusKm)
+            }
+        val resolved = multimediaService.resolvePresignedUrls(contents.map { it.thumbnail ?: "" })
+        val newContents =
+            contents.mapIndexed { idx, item ->
+                if (item.thumbnail.isNullOrBlank()) item else item.copy(thumbnail = resolved[idx])
+            }
         val hasNextPage = totalCount > (offset + contents.size)
-        return NearbyPostsPage(contents = contents, hasNextPage = hasNextPage, totalCount = totalCount)
+        return NearbyPostsPage(contents = newContents, hasNextPage = hasNextPage, totalCount = totalCount)
     }
 
     data class NearbyPostsPage(
@@ -210,8 +237,16 @@ class PostService(
             throw BusinessException(ErrorCode.NOT_FOUND_POST_IMAGE)
         }
 
-    @Transactional(readOnly = true)
-    fun myPage(userId: UUID): List<PostSummaryResponse> = postRepository.findSummarizedPostsByUserId(userId)
+    suspend fun myPage(userId: UUID): List<PostSummaryResponse> {
+        val rows =
+            withContext(Dispatchers.IO) {
+                postRepository.findSummarizedPostsByUserId(userId)
+            }
+        val resolved = multimediaService.resolvePresignedUrls(rows.map { it.thumbnail ?: "" })
+        return rows.mapIndexed { idx, item ->
+            if (item.thumbnail.isNullOrBlank()) item else item.copy(thumbnail = resolved[idx])
+        }
+    }
 
     fun updateAuthor(
         userId: UUID,

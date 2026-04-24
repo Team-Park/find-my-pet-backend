@@ -3,6 +3,7 @@ package com.park.animal.matching
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.park.animal.matching.dto.MatchCandidate
+import com.park.animal.multimedia.MultimediaService
 import com.park.animal.post.entity.Post
 import com.park.animal.post.repository.PostImageRepository
 import com.park.animal.publicdata.AbandonedAnimalService
@@ -35,6 +36,7 @@ class GeminiVisionMatchingClient(
     private val visionApiClient: VisionApiClient,
     private val abandonedAnimalService: AbandonedAnimalService,
     private val postImageRepository: PostImageRepository,
+    private val multimediaService: MultimediaService,
     private val objectMapper: ObjectMapper,
 ) : AiMatchingClient {
     companion object {
@@ -63,7 +65,8 @@ class GeminiVisionMatchingClient(
         post: Post,
         candidateLimit: Int,
     ): List<MatchCandidate> {
-        val missingPhoto = firstImageUrl(post) ?: return emptyList()
+        val stored = firstImageUrl(post) ?: return emptyList()
+        val missingPhoto = multimediaService.resolvePresignedUrl(stored)
 
         val pool = fetchCandidatePool(post)
         if (pool.isEmpty()) return emptyList()
