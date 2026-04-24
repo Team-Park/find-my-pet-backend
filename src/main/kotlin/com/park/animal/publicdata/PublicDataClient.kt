@@ -21,7 +21,7 @@ class PublicDataClient(
     @Qualifier("publicDataApiKey") private val apiKey: String,
 ) {
     companion object {
-        const val PATH = "/abandonmentPublic"
+        const val PATH = "/abandonmentPublic_v2"
         private val log = LoggerFactory.getLogger(PublicDataClient::class.java)
     }
 

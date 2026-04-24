@@ -10,7 +10,7 @@ import java.io.File
 @Configuration
 class PublicDataConfig {
     companion object {
-        const val BASE_URL = "http://apis.data.go.kr/1543061/abandonmentPublicSrvc"
+        const val BASE_URL = "https://apis.data.go.kr/1543061/abandonmentPublicService_v2"
         private val log = LoggerFactory.getLogger(PublicDataConfig::class.java)
     }
 
