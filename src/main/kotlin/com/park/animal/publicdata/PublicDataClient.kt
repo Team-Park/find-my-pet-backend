@@ -141,10 +141,12 @@ class PublicDataClient(
     ) {
         fun toDomain(): AbandonedAnimalResponse {
             val displayKind = kindFullNm ?: kindNm ?: kindCd
-            val primaryPhoto = popfile1 ?: popfile2
+            // openapi.animal.go.kr 은 http/https 둘 다 동일한 파일을 서빙하지만
+            // 프론트는 HTTPS 페이지이므로 mixed-content 차단 회피 위해 강제로 https 로 치환.
+            val primaryPhoto = (popfile1 ?: popfile2)?.toHttps()
             return AbandonedAnimalResponse(
                 desertionNo = desertionNo,
-                filename = filename ?: primaryPhoto,
+                filename = (filename ?: primaryPhoto)?.toHttps(),
                 popfile = primaryPhoto,
                 kindCd = displayKind,
                 sexCd = sexCd,
@@ -163,6 +165,9 @@ class PublicDataClient(
                 animalType = classifyAnimalType(upKindCd, displayKind),
             )
         }
+
+        private fun String.toHttps(): String =
+            if (startsWith("http://")) "https://" + substring("http://".length) else this
 
         /**
          * upKindCd (417000/422400/429900) 우선, 없으면 표시명 프리픽스(`[개]`/`[고양이]`)로 분류.
