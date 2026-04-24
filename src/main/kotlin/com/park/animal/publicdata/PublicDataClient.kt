@@ -109,12 +109,21 @@ class PublicDataClient(
         val item: List<RawItem>?,
     )
 
+    /**
+     * v2 스키마 기준 필드. v1 호환 위해 popfile/kindCd 는 v2 의 popfile1/kindFullNm 로부터 유도.
+     */
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class RawItem(
         val desertionNo: String,
-        val filename: String?,
-        val popfile: String?,
-        val kindCd: String?,
+        val filename: String? = null,
+        @JsonProperty("popfile1") val popfile1: String? = null,
+        @JsonProperty("popfile2") val popfile2: String? = null,
+        /** v2: 코드("000200"). v1 에서는 "[개] 말티즈" 였음. */
+        val kindCd: String? = null,
+        /** v2 신규: "[개] 말티즈" 형태 full name. */
+        @JsonProperty("kindFullNm") val kindFullNm: String? = null,
+        /** v2 신규: "말티즈" */
+        @JsonProperty("kindNm") val kindNm: String? = null,
         val sexCd: String?,
         val age: String?,
         val weight: String?,
@@ -130,12 +139,14 @@ class PublicDataClient(
         val noticeEdt: String?,
         @JsonProperty("upKindCd") val upKindCd: String? = null,
     ) {
-        fun toDomain(): AbandonedAnimalResponse =
-            AbandonedAnimalResponse(
+        fun toDomain(): AbandonedAnimalResponse {
+            val displayKind = kindFullNm ?: kindNm ?: kindCd
+            val primaryPhoto = popfile1 ?: popfile2
+            return AbandonedAnimalResponse(
                 desertionNo = desertionNo,
-                filename = filename,
-                popfile = popfile,
-                kindCd = kindCd,
+                filename = filename ?: primaryPhoto,
+                popfile = primaryPhoto,
+                kindCd = displayKind,
                 sexCd = sexCd,
                 age = age,
                 weight = weight,
@@ -149,16 +160,16 @@ class PublicDataClient(
                 noticeNo = noticeNo,
                 noticeSdt = noticeSdt,
                 noticeEdt = noticeEdt,
-                animalType = classifyAnimalType(upKindCd, kindCd),
+                animalType = classifyAnimalType(upKindCd, displayKind),
             )
+        }
 
         /**
-         * 공공데이터 upKindCd (417000/422400/429900) 또는 kindCd 프리픽스로 분류.
-         * 원본 `[개] 말티즈` 패턴 → `DOG`.
+         * upKindCd (417000/422400/429900) 우선, 없으면 표시명 프리픽스(`[개]`/`[고양이]`)로 분류.
          */
         private fun classifyAnimalType(
             upKindCd: String?,
-            kindCd: String?,
+            displayKind: String?,
         ): String =
             when (upKindCd) {
                 "417000" -> "DOG"
@@ -166,9 +177,9 @@ class PublicDataClient(
                 "429900" -> "OTHER"
                 else ->
                     when {
-                        kindCd == null -> "OTHER"
-                        kindCd.startsWith("[개]") -> "DOG"
-                        kindCd.startsWith("[고양이]") -> "CAT"
+                        displayKind == null -> "OTHER"
+                        displayKind.startsWith("[개]") -> "DOG"
+                        displayKind.startsWith("[고양이]") -> "CAT"
                         else -> "OTHER"
                     }
             }
