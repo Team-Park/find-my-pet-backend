@@ -5,9 +5,11 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.park.animal.publicdata.dto.AbandonedAnimalPage
 import com.park.animal.publicdata.dto.AbandonedAnimalResponse
 import kotlinx.coroutines.reactor.awaitSingle
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.WebClientResponseException
 
 /**
  * 공공데이터포털 국가동물보호정보시스템 `abandonmentPublicSrvc` API 호출 클라이언트.
@@ -20,6 +22,7 @@ class PublicDataClient(
 ) {
     companion object {
         const val PATH = "/abandonmentPublic"
+        private val log = LoggerFactory.getLogger(PublicDataClient::class.java)
     }
 
     suspend fun fetchAbandonedAnimals(
@@ -29,22 +32,38 @@ class PublicDataClient(
         bgnde: String?,
         endde: String?,
     ): AbandonedAnimalPage {
+        if (apiKey.isBlank()) {
+            log.warn("publicDataApiKey is blank — /abandoned-animals will fail")
+        }
         val response =
-            webClient
-                .get()
-                .uri { builder ->
-                    builder.path(PATH)
-                    builder.queryParam("serviceKey", apiKey)
-                    builder.queryParam("_type", "json")
-                    builder.queryParam("numOfRows", numOfRows)
-                    builder.queryParam("pageNo", pageNo)
-                    upkind?.let { builder.queryParam("upkind", it) }
-                    bgnde?.let { builder.queryParam("bgnde", it) }
-                    endde?.let { builder.queryParam("endde", it) }
-                    builder.build()
-                }.retrieve()
-                .bodyToMono(PublicDataEnvelope::class.java)
-                .awaitSingle()
+            try {
+                webClient
+                    .get()
+                    .uri { builder ->
+                        builder.path(PATH)
+                        builder.queryParam("serviceKey", apiKey)
+                        builder.queryParam("_type", "json")
+                        builder.queryParam("numOfRows", numOfRows)
+                        builder.queryParam("pageNo", pageNo)
+                        upkind?.let { builder.queryParam("upkind", it) }
+                        bgnde?.let { builder.queryParam("bgnde", it) }
+                        endde?.let { builder.queryParam("endde", it) }
+                        builder.build()
+                    }.retrieve()
+                    .bodyToMono(PublicDataEnvelope::class.java)
+                    .awaitSingle()
+            } catch (e: WebClientResponseException) {
+                // data.go.kr 은 auth 에러/쿼터 초과 등을 200 대신 500 + 일반 텍스트로 응답하는 케이스가 많음.
+                // 원인 파악을 위해 status + body preview + 키 앞 6자 지문 만 로깅 (키 전체 노출 금지).
+                val keyFp = apiKey.take(6) + "..." + "(len=${apiKey.length})"
+                log.error(
+                    "data.go.kr upstream error status={} body='{}' keyFingerprint={}",
+                    e.statusCode,
+                    e.responseBodyAsString.take(400),
+                    keyFp,
+                )
+                throw e
+            }
 
         val body = response.response?.body
         val items = body?.items?.item.orEmpty()
