@@ -20,6 +20,7 @@ class AbandonedAnimalSyncService(
     private val abandonedAnimalRepository: AbandonedAnimalRepository,
     private val subscriptionRepository: AbandonedSubscriptionRepository,
     private val notificationService: NotificationService,
+    private val regionLookupService: RegionLookupService,
 ) {
     companion object {
         private const val PAGE_SIZE = 500
@@ -29,8 +30,8 @@ class AbandonedAnimalSyncService(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    /** 1시간 주기 sync. 첫 실행은 부팅 후 5분 뒤. */
-    @Scheduled(initialDelay = 5L * 60_000, fixedDelay = 60L * 60_000)
+    /** 1시간 주기 sync. 첫 실행은 부팅 후 30초 뒤 (local DB 빠르게 채우기). */
+    @Scheduled(initialDelay = 30_000, fixedDelay = 60L * 60_000)
     fun runSync() {
         runBlocking {
             try {
@@ -141,14 +142,13 @@ class AbandonedAnimalSyncService(
         return matchedUsers.size
     }
 
-    private fun toEntity(r: AbandonedAnimalResponse): AbandonedAnimal =
-        AbandonedAnimal(
+    private fun toEntity(r: AbandonedAnimalResponse): AbandonedAnimal {
+        val region = regionLookupService.lookup(r.orgNm)
+        return AbandonedAnimal(
             desertionNo = r.desertionNo,
             animalType = r.animalType ?: "OTHER",
-            // upr/org cd 는 v2 응답에 직접 안 들어옴 — care_addr 시도 prefix 매칭으로 추출은 부정확하므로 sigungu 보호소 정보 기반 추정.
-            // 단순화 위해 우선 null 로 저장. 추후 reverse mapping 강화 가능.
-            uprCd = null,
-            orgCd = null,
+            uprCd = region?.uprCd,
+            orgCd = region?.orgCd,
             kindFullNm = r.kindCd,
             popfile = r.popfile,
             sexCd = r.sexCd,
@@ -165,6 +165,7 @@ class AbandonedAnimalSyncService(
             noticeSdt = r.noticeSdt,
             noticeEdt = r.noticeEdt,
         )
+    }
 
     data class SyncReport(
         val fetched: Int,

@@ -197,6 +197,8 @@ class PublicDataClient(
         val noticeSdt: String?,
         val noticeEdt: String?,
         @JsonProperty("upKindCd") val upKindCd: String? = null,
+        /** "경상남도 거창군" 등 관할 행정명. uprCd/orgCd 매핑 키. */
+        @JsonProperty("orgNm") val orgNm: String? = null,
     ) {
         fun toDomain(): AbandonedAnimalResponse {
             val displayKind = kindFullNm ?: kindNm ?: kindCd
@@ -222,6 +224,7 @@ class PublicDataClient(
                 noticeSdt = noticeSdt,
                 noticeEdt = noticeEdt,
                 animalType = classifyAnimalType(upKindCd, displayKind),
+                orgNm = orgNm,
             )
         }
 

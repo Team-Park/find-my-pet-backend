@@ -28,4 +28,6 @@ data class AbandonedAnimalResponse(
     val noticeEdt: String?,
     /** DOG / CAT / OTHER — kindCd 기반 서버에서 분류 */
     val animalType: String?,
+    /** 관할 행정명 ("경상남도 거창군"). 시도/시군구 코드 매핑에 사용. */
+    val orgNm: String? = null,
 )
