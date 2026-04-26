@@ -1,11 +1,14 @@
 package com.park.animal.post
 
+import com.park.animal.bookmark.BookmarkService
 import com.park.animal.breed.entity.AnimalType
 import com.park.animal.breed.repository.BreedRepository
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
 import com.park.animal.common.http.error.exception.ImageUploadException
 import com.park.animal.multimedia.MultimediaService
+import com.park.animal.notification.NotificationService
+import com.park.animal.notification.entity.NotificationType
 import com.park.animal.post.dto.PostDetailResponse
 import com.park.animal.post.dto.PostNearbyResponse
 import com.park.animal.post.dto.PostSummaryResponse
@@ -37,6 +40,8 @@ class PostService(
     private val postImageRepository: PostImageRepository,
     private val breedRepository: BreedRepository,
     private val postNearbyRepository: PostNearbyRepository,
+    private val notificationService: NotificationService,
+    private val bookmarkService: BookmarkService,
 ) {
     companion object {
         const val CANCEL_USER_NAME = "탈퇴한 사용자"
@@ -269,6 +274,29 @@ class PostService(
         if (post.authorId != userId) {
             throw BusinessException(ErrorCode.FORBIDDEN)
         }
+        val previous = post.missingAnimalStatus
         post.updateStatus(status)
+
+        // 즐겨찾기한 사용자들에게 상태 변경 알림 (작성자 본인은 제외).
+        if (previous != status) {
+            val bookmarkers = bookmarkService.findBookmarkUserIdsByPost(postId)
+            if (bookmarkers.isNotEmpty()) {
+                notificationService.createMany(
+                    userIds = bookmarkers,
+                    excludeUserId = userId,
+                    type = NotificationType.BOOKMARK_STATUS_CHANGED,
+                    title = "즐겨찾기 게시글 상태가 변경됐어요",
+                    body = "${post.title} → ${labelOf(status)}",
+                    link = "/lost/${post.id}",
+                )
+            }
+        }
     }
+
+    private fun labelOf(status: MissingAnimalStatus): String =
+        when (status) {
+            MissingAnimalStatus.SEARCHING -> "찾는 중"
+            MissingAnimalStatus.FOUND -> "찾음"
+            MissingAnimalStatus.SEEN -> "목격됨"
+        }
 }

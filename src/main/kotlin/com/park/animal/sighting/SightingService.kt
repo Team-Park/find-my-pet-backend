@@ -2,6 +2,8 @@ package com.park.animal.sighting
 
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
+import com.park.animal.notification.NotificationService
+import com.park.animal.notification.entity.NotificationType
 import com.park.animal.post.repository.PostRepository
 import com.park.animal.sighting.dto.RegisterSightingRequest
 import com.park.animal.sighting.dto.SightingResponse
@@ -17,6 +19,7 @@ import kotlin.jvm.optionals.getOrNull
 class SightingService(
     private val sightingRepository: SightingRepository,
     private val postRepository: PostRepository,
+    private val notificationService: NotificationService,
 ) {
     @Transactional
     fun register(
@@ -25,8 +28,9 @@ class SightingService(
         reporterName: String?,
         request: RegisterSightingRequest,
     ): SightingResponse {
-        postRepository.findById(postId).getOrNull()
-            ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
+        val post =
+            postRepository.findById(postId).getOrNull()
+                ?: throw BusinessException(ErrorCode.NOT_FOUND_POST)
         val saved =
             sightingRepository.save(
                 Sighting(
@@ -40,6 +44,17 @@ class SightingService(
                     photoUrl = request.photoUrl,
                 ),
             )
+
+        // 게시자에게 알림 (본인이 본인 글에 sighting 등록한 경우엔 skip).
+        notificationService.create(
+            userId = post.authorId,
+            actorId = reporterId,
+            type = NotificationType.SIGHTING_REGISTERED,
+            title = "목격 제보가 등록됐어요",
+            body = "${post.title} 글에 새 제보가 추가됐습니다.",
+            link = "/lost/${post.id}",
+        )
+
         return SightingResponse.from(saved, viewerId = reporterId)
     }
 

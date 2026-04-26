@@ -45,6 +45,13 @@ enum class ErrorCode(
     // sighting
     NOT_FOUND_SIGHTING("목격 제보를 찾을 수 없습니다", HttpStatus.BAD_REQUEST, WARN),
 
+    // notification
+    NOT_FOUND_NOTIFICATION("알림을 찾을 수 없습니다", HttpStatus.BAD_REQUEST, WARN),
+
+    // bookmark
+    NOT_FOUND_BOOKMARK("즐겨찾기 항목을 찾을 수 없습니다", HttpStatus.BAD_REQUEST, WARN),
+    DUPLICATE_BOOKMARK("이미 즐겨찾기에 추가된 게시글입니다", HttpStatus.BAD_REQUEST, WARN),
+
     UNKNOWN_ERROR("알 수 없는 에러", HttpStatus.INTERNAL_SERVER_ERROR, ERROR),
 }
 
