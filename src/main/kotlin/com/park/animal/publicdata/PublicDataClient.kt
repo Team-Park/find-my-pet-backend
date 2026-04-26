@@ -22,6 +22,8 @@ class PublicDataClient(
 ) {
     companion object {
         const val PATH = "/abandonmentPublic_v2"
+        const val SIDO_PATH = "/sido_v2"
+        const val SIGUNGU_PATH = "/sigungu_v2"
         private val log = LoggerFactory.getLogger(PublicDataClient::class.java)
     }
 
@@ -31,6 +33,8 @@ class PublicDataClient(
         numOfRows: Int,
         bgnde: String?,
         endde: String?,
+        uprCd: String? = null,
+        orgCd: String? = null,
     ): AbandonedAnimalPage {
         if (apiKey.isBlank()) {
             log.warn("publicDataApiKey is blank — /abandoned-animals will fail")
@@ -48,6 +52,8 @@ class PublicDataClient(
                         upkind?.let { builder.queryParam("upkind", it) }
                         bgnde?.let { builder.queryParam("bgnde", it) }
                         endde?.let { builder.queryParam("endde", it) }
+                        uprCd?.let { builder.queryParam("upr_cd", it) }
+                        orgCd?.let { builder.queryParam("org_cd", it) }
                         builder.build()
                     }.retrieve()
                     .bodyToMono(PublicDataEnvelope::class.java)
@@ -75,6 +81,39 @@ class PublicDataClient(
             hasNextPage = hasNext,
             totalCount = totalCount,
         )
+    }
+
+    /** 시도(상위 행정구역) 목록. */
+    suspend fun fetchSidoList(): List<RegionItem> = fetchRegions(SIDO_PATH, uprCd = null)
+
+    /** 시군구 목록 — 상위 시도 코드 필요. */
+    suspend fun fetchSigunguList(uprCd: String): List<RegionItem> = fetchRegions(SIGUNGU_PATH, uprCd = uprCd)
+
+    private suspend fun fetchRegions(
+        path: String,
+        uprCd: String?,
+    ): List<RegionItem> {
+        if (apiKey.isBlank()) return emptyList()
+        val response =
+            try {
+                webClient
+                    .get()
+                    .uri { builder ->
+                        builder.path(path)
+                        builder.queryParam("serviceKey", apiKey)
+                        builder.queryParam("_type", "json")
+                        builder.queryParam("numOfRows", 1000)
+                        builder.queryParam("pageNo", 1)
+                        uprCd?.let { builder.queryParam("upr_cd", it) }
+                        builder.build()
+                    }.retrieve()
+                    .bodyToMono(RegionEnvelope::class.java)
+                    .awaitSingle()
+            } catch (e: WebClientResponseException) {
+                log.error("region API ({}) error: status={} body='{}'", path, e.statusCode, e.responseBodyAsString.take(300))
+                return emptyList()
+            }
+        return response.response?.body?.items?.item.orEmpty()
     }
 
     // -------- 공공데이터 응답 envelope 매핑 --------
@@ -107,6 +146,26 @@ class PublicDataClient(
     @JsonIgnoreProperties(ignoreUnknown = true)
     data class Items(
         val item: List<RawItem>?,
+    )
+
+    // 시도/시군구 코드 응답 envelope (구조 동일, item 만 다름).
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class RegionEnvelope(val response: RegionResponseBody?)
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class RegionResponseBody(val header: Header?, val body: RegionBody?)
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class RegionBody(val items: RegionItems?)
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class RegionItems(val item: List<RegionItem>?)
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    data class RegionItem(
+        @JsonProperty("orgCd") val orgCd: String? = null,
+        @JsonProperty("orgdownNm") val orgdownNm: String? = null,
+        @JsonProperty("uprCd") val uprCd: String? = null,
     )
 
     /**

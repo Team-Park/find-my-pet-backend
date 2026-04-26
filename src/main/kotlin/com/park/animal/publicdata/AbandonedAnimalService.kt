@@ -34,15 +34,17 @@ class AbandonedAnimalService(
         numOfRows: Int,
         bgnde: String?,
         endde: String?,
+        uprCd: String? = null,
+        orgCd: String? = null,
     ): AbandonedAnimalPage {
         val upkind = animalType?.let { UPKIND_MAP[it.uppercase()] }
-        val cacheKey = buildCacheKey(upkind, pageNo, numOfRows, bgnde, endde)
+        val cacheKey = buildCacheKey(upkind, pageNo, numOfRows, bgnde, endde, uprCd, orgCd)
 
         redisDriver.getValue(cacheKey, String::class.java)?.let { cached ->
             return objectMapper.readValue(cached)
         }
 
-        val page = publicDataClient.fetchAbandonedAnimals(upkind, pageNo, numOfRows, bgnde, endde)
+        val page = publicDataClient.fetchAbandonedAnimals(upkind, pageNo, numOfRows, bgnde, endde, uprCd, orgCd)
 
         runCatching {
             redisDriver.setValue(cacheKey, objectMapper.writeValueAsString(page), CACHE_TTL_SECONDS)
@@ -51,11 +53,37 @@ class AbandonedAnimalService(
         return page
     }
 
+    /** 시도 목록 — 24h 캐시. */
+    suspend fun findSidoList(): List<PublicDataClient.RegionItem> {
+        val key = "$CACHE_KEY_PREFIX:sido"
+        redisDriver.getValue(key, String::class.java)?.let { cached ->
+            return objectMapper.readValue(cached)
+        }
+        val list = publicDataClient.fetchSidoList()
+        runCatching { redisDriver.setValue(key, objectMapper.writeValueAsString(list), 86_400L) }
+        return list
+    }
+
+    /** 시군구 목록 — 시도 코드별 24h 캐시. */
+    suspend fun findSigunguList(uprCd: String): List<PublicDataClient.RegionItem> {
+        val key = "$CACHE_KEY_PREFIX:sigungu:$uprCd"
+        redisDriver.getValue(key, String::class.java)?.let { cached ->
+            return objectMapper.readValue(cached)
+        }
+        val list = publicDataClient.fetchSigunguList(uprCd)
+        runCatching { redisDriver.setValue(key, objectMapper.writeValueAsString(list), 86_400L) }
+        return list
+    }
+
     private fun buildCacheKey(
         upkind: String?,
         pageNo: Int,
         numOfRows: Int,
         bgnde: String?,
         endde: String?,
-    ): String = "$CACHE_KEY_PREFIX:${upkind ?: "ALL"}:$pageNo:$numOfRows:${bgnde ?: "-"}:${endde ?: "-"}"
+        uprCd: String?,
+        orgCd: String?,
+    ): String =
+        "$CACHE_KEY_PREFIX:${upkind ?: "ALL"}:$pageNo:$numOfRows:${bgnde ?: "-"}:${endde ?: "-"}" +
+            ":${uprCd ?: "-"}:${orgCd ?: "-"}"
 }

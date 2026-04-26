@@ -33,8 +33,12 @@ class AbandonedAnimalController(
         @RequestParam("bgnde", required = false) bgnde: String?,
         @Parameter(description = "발견 종료일 YYYYMMDD", example = "20260421")
         @RequestParam("endde", required = false) endde: String?,
+        @Parameter(description = "시도 코드 (예: 6110000 서울특별시)")
+        @RequestParam("uprCd", required = false) uprCd: String?,
+        @Parameter(description = "시군구 코드")
+        @RequestParam("orgCd", required = false) orgCd: String?,
     ): PaginatedApiResponseBody<AbandonedAnimalResponse> {
-        val page = abandonedAnimalService.findAbandonedAnimals(animalType, pageNo, numOfRows, bgnde, endde)
+        val page = abandonedAnimalService.findAbandonedAnimals(animalType, pageNo, numOfRows, bgnde, endde, uprCd, orgCd)
         return PaginatedApiResponseBody(
             data =
                 PaginatedApiResponseDto(
@@ -44,4 +48,18 @@ class AbandonedAnimalController(
                 ),
         )
     }
+
+    @PublicEndPoint
+    @GetMapping("/abandoned-animals/sido")
+    @Operation(summary = "시도 코드 목록")
+    suspend fun getSido(): org.woo.http.SucceededApiResponseBody<List<PublicDataClient.RegionItem>> =
+        org.woo.http.SucceededApiResponseBody(data = abandonedAnimalService.findSidoList())
+
+    @PublicEndPoint
+    @GetMapping("/abandoned-animals/sigungu")
+    @Operation(summary = "시군구 코드 목록 — 상위 시도 코드 필요")
+    suspend fun getSigungu(
+        @Parameter(description = "시도 코드 (예: 6110000)") @RequestParam("uprCd") uprCd: String,
+    ): org.woo.http.SucceededApiResponseBody<List<PublicDataClient.RegionItem>> =
+        org.woo.http.SucceededApiResponseBody(data = abandonedAnimalService.findSigunguList(uprCd))
 }
