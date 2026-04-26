@@ -38,19 +38,36 @@ class ReachableService(
         private const val CACHE_TTL_SECONDS = 7L * 24 * 3600 // 7일
         private const val CACHE_KEY_PREFIX = "fmp:reachable"
 
-        // 개 선형 모델 파라미터
-        private const val PHASE1_HOURS = 72.0
-        private const val PHASE2_DECAY = 0.15
-        private const val DOG_MIN_M = 100.0
-        private const val DOG_MAX_M = 30_000.0
-        private const val FALLBACK_DOG_SPEED = 2.5
-        private const val FALLBACK_DOG_FACTOR = 0.8
+        /**
+         * 시간(h) → likely(95% 발견 거리, m) 통계 lookup table.
+         * 출처: PetFBI / Missing Pet Partnership 실종 반려동물 발견 거리 통계 기반.
+         * 단순 누적 이동거리(speed×time) 가 아니라 **활동시간 비율 + 배회 패턴이 반영된 직선 변위 95% 분위수**.
+         * - DOG: 50% < 0.8km / 75% < 1.6km / 95% < 5km (3일 기준)
+         * - CAT: 60% < 100m, 7일 후부터 천천히 확장
+         */
+        private val DOG_LIKELY_TABLE: List<Pair<Double, Double>> =
+            listOf(
+                1.0 to 200.0,
+                6.0 to 800.0,
+                24.0 to 1500.0,
+                72.0 to 3000.0,
+                168.0 to 5000.0,
+                336.0 to 8000.0,
+                720.0 to 12000.0,
+            )
 
-        // 고양이 고정 반경 (미터)
-        private const val CAT_CORE = 150.0
-        private const val CAT_LIKELY = 500.0
-        private const val CAT_POSSIBLE = 1500.0
-        private const val CAT_POSSIBLE_MAX = 3000.0
+        private val CAT_LIKELY_TABLE: List<Pair<Double, Double>> =
+            listOf(
+                1.0 to 50.0,
+                24.0 to 100.0,
+                72.0 to 200.0,
+                168.0 to 300.0,
+                336.0 to 500.0,
+                720.0 to 800.0,
+            )
+
+        private const val DOG_CAP_M = 12_000.0
+        private const val CAT_CAP_M = 1_500.0
 
         // 기타 고정 반경
         private const val OTHER_CORE = 30.0
@@ -108,18 +125,16 @@ class ReachableService(
         }
     }
 
-    // ───── CAT: 고정 반경, 7일+부터 possible 확장 ─────
+    // ───── CAT: lookup 기반 보수적 반경 ─────
     private fun catCircle(post: Post): ReachableResponse {
-        val elapsedHours = hoursSince(post.time)
-        val daysOverWeek = max(0.0, elapsedHours / 24 - 7)
-        val possible = min(CAT_POSSIBLE_MAX, CAT_POSSIBLE + daysOverWeek * 300)
+        val likely = min(CAT_CAP_M, interpolate(CAT_LIKELY_TABLE, hoursSince(post.time)))
         return ReachableResponse.CircleFallback(
             center = ReachableResponse.CircleFallback.Center(post.lat, post.lng),
             bands =
                 ReachableResponse.CircleFallback.Bands(
-                    core = CAT_CORE,
-                    likely = CAT_LIKELY,
-                    possible = round2(possible),
+                    core = round2(likely * 0.3),
+                    likely = round2(likely),
+                    possible = round2(min(CAT_CAP_M, likely * 1.6)),
                 ),
         )
     }
@@ -151,23 +166,37 @@ class ReachableService(
                 ),
         )
 
-    // ───── 2-Phase 반경 계산 (미터 단위) ─────
+    // ───── 통계 lookup 기반 반경 (미터) ─────
     private fun computeDogBands(post: Post): DogBands {
-        val h = hoursSince(post.time)
         val breed = post.breedId?.let { breedRepository.findById(it).getOrNull() }
-        val speed = breed?.baseSpeedKmh ?: FALLBACK_DOG_SPEED
-        val factor = breed?.exploreFactor ?: FALLBACK_DOG_FACTOR
+        // exploreFactor (대략 0.5~1.3) 를 ×0.7~1.3 multiplier 로 매핑.
+        val factor = breed?.exploreFactor ?: 1.0
+        val multiplier = max(0.7, min(1.3, 0.7 + (factor - 0.5) * 0.75))
 
-        val phase1 = min(h, PHASE1_HOURS) * speed * factor
-        val phase2 = max(0.0, h - PHASE1_HOURS) * speed * factor * PHASE2_DECAY
-        val baseKm = phase1 + phase2
-        val baseM = max(DOG_MIN_M, min(DOG_MAX_M, baseKm * 1000))
-
+        val likely = min(DOG_CAP_M, interpolate(DOG_LIKELY_TABLE, hoursSince(post.time)) * multiplier)
         return DogBands(
-            core = baseM * 0.3,
-            likely = baseM * 1.0,
-            possible = min(DOG_MAX_M, baseM * 1.8),
+            core = likely * 0.3,
+            likely = likely,
+            possible = min(DOG_CAP_M, likely * 1.6),
         )
+    }
+
+    /** 두 (x,y) 점 사이 선형 보간. table 은 x 오름차순 가정. */
+    private fun interpolate(
+        table: List<Pair<Double, Double>>,
+        x: Double,
+    ): Double {
+        if (x <= table.first().first) return table.first().second
+        if (x >= table.last().first) return table.last().second
+        for (i in 0 until table.size - 1) {
+            val (x0, y0) = table[i]
+            val (x1, y1) = table[i + 1]
+            if (x in x0..x1) {
+                val t = (x - x0) / (x1 - x0)
+                return y0 + (y1 - y0) * t
+            }
+        }
+        return table.last().second
     }
 
     private fun hoursSince(time: LocalDateTime): Double {
