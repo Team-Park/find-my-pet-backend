@@ -6,4 +6,7 @@ enum class NotificationType {
 
     /** 내가 즐겨찾기한 게시글의 상태(SEARCHING/FOUND/SEEN)가 변경됨 */
     BOOKMARK_STATUS_CHANGED,
+
+    /** 내가 구독한 지역에 신규 유기동물 등록됨 */
+    ABANDONED_NEW_IN_REGION,
 }
