@@ -50,6 +50,22 @@ class AbandonedAnimalController(
     }
 
     @PublicEndPoint
+    @GetMapping("/abandoned-animals/{desertionNo}")
+    @Operation(
+        summary = "유기동물 단건 조회 (로컬 mirror)",
+        description = "SEO/SSR 용. desertionNo path param 으로 단건 조회. 미존재 또는 closed 항목은 404.",
+    )
+    suspend fun getOne(
+        @org.springframework.web.bind.annotation.PathVariable desertionNo: String,
+    ): org.woo.http.SucceededApiResponseBody<AbandonedAnimalResponse> {
+        val item = abandonedAnimalService.findByDesertionNo(desertionNo)
+            ?: throw com.park.animal.common.http.error.exception.BusinessException(
+                com.park.animal.common.http.error.ErrorCode.NOT_FOUND_REQUEST,
+            )
+        return org.woo.http.SucceededApiResponseBody(data = item)
+    }
+
+    @PublicEndPoint
     @GetMapping("/abandoned-animals/sido")
     @Operation(summary = "시도 코드 목록")
     suspend fun getSido(): org.woo.http.SucceededApiResponseBody<List<PublicDataClient.RegionItem>> =

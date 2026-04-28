@@ -96,6 +96,10 @@ class AbandonedAnimalService(
         return page
     }
 
+    /** 단건 조회 — local mirror 에서 desertionNo 매칭. */
+    fun findByDesertionNo(desertionNo: String): AbandonedAnimalResponse? =
+        abandonedAnimalRepository.findByDesertionNo(desertionNo)?.let(::toResponse)
+
     private fun toResponse(a: AbandonedAnimal): AbandonedAnimalResponse =
         AbandonedAnimalResponse(
             desertionNo = a.desertionNo,
