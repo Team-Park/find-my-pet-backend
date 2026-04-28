@@ -24,8 +24,13 @@ class AbandonedAnimalSyncService(
 ) {
     companion object {
         private const val PAGE_SIZE = 500
-        private const val MAX_PAGES = 20 // 최대 10,000건 (페이지당 500 × 20). 충분히 여유.
+        // 안전 상한 — 보호중 표본이 25,000 이상이면 별도 검토. 응답 totalCount 따라 동적으로 더 작게 조정됨.
+        private const val MAX_PAGES = 50
         private const val ALERT_BURST_CAP_PER_USER = 5
+
+        // 한 sync 에서 stale 비율이 이 임계 초과 + openLocal 충분히 클 때 → close 스킵 (data.go.kr silent breaking change 방어).
+        private const val STALE_GUARD_RATIO = 0.5
+        private const val STALE_GUARD_MIN_OPEN = 100
     }
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -52,9 +57,27 @@ class AbandonedAnimalSyncService(
 
     @Transactional
     suspend fun sync(): SyncReport {
-        // 1. data.go.kr v2 페이지 순회 — animalType 필터 없이 전체.
+        // 1. 첫 페이지 fetch 로 totalCount 확인 → 필요한 페이지 수만 순회.
         val fetched = mutableMapOf<String, AbandonedAnimal>()
-        for (page in 1..MAX_PAGES) {
+        val firstPage =
+            publicDataClient.fetchAbandonedAnimals(
+                upkind = null,
+                pageNo = 1,
+                numOfRows = PAGE_SIZE,
+                bgnde = null,
+                endde = null,
+            )
+        firstPage.contents.forEach { fetched[it.desertionNo] = toEntity(it) }
+
+        val totalPages =
+            if (firstPage.totalCount > 0) {
+                ((firstPage.totalCount + PAGE_SIZE - 1) / PAGE_SIZE).toInt().coerceAtMost(MAX_PAGES)
+            } else {
+                1
+            }
+        log.debug("abandoned sync — totalCount={} → totalPages={}", firstPage.totalCount, totalPages)
+
+        for (page in 2..totalPages) {
             val resp = publicDataClient.fetchAbandonedAnimals(
                 upkind = null,
                 pageNo = page,
@@ -108,11 +131,23 @@ class AbandonedAnimalSyncService(
         }
 
         // stale: 응답에 없는 open → close.
+        // ★ data.go.kr 응답 이상(키 만료/스키마 변경/일시 부분 응답) 으로 stale 비율이 비정상 일 때 close 스킵.
         var closed = 0
-        for (no in staleDesertionNos) {
-            val existing = abandonedAnimalRepository.findByDesertionNo(no) ?: continue
-            existing.close()
-            closed++
+        val staleRatio =
+            if (openLocal.isEmpty()) 0.0 else staleDesertionNos.size.toDouble() / openLocal.size
+        if (staleRatio > STALE_GUARD_RATIO && openLocal.size >= STALE_GUARD_MIN_OPEN) {
+            log.warn(
+                "stale guard tripped — staleRatio={}, openLocal={}, stale={}. close skipped.",
+                staleRatio,
+                openLocal.size,
+                staleDesertionNos.size,
+            )
+        } else {
+            for (no in staleDesertionNos) {
+                val existing = abandonedAnimalRepository.findByDesertionNo(no) ?: continue
+                existing.close()
+                closed++
+            }
         }
 
         return SyncReport(fetched.size, inserted, updated, closed, fanout)
