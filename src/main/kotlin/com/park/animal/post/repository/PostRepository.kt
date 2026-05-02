@@ -34,6 +34,23 @@ interface PostRepository :
         @Param("authorId") authorId: UUID,
         @Param("newName") newName: String,
     )
+
+    @Query(
+        """
+        SELECT p FROM Post p
+        WHERE p.deletedAt IS NULL
+          AND (
+            LOWER(p.title) LIKE LOWER(CONCAT('%', :q, '%'))
+            OR LOWER(p.description) LIKE LOWER(CONCAT('%', :q, '%'))
+            OR LOWER(p.place) LIKE LOWER(CONCAT('%', :q, '%'))
+          )
+        ORDER BY p.createdAt DESC
+        """,
+    )
+    fun searchByKeyword(
+        @Param("q") q: String,
+        pageable: org.springframework.data.domain.Pageable,
+    ): org.springframework.data.domain.Page<Post>
 }
 
 interface PostQueryRepository {

@@ -31,4 +31,23 @@ interface AbandonedAnimalRepository : JpaRepository<AbandonedAnimal, UUID> {
         @Param("orgCd") orgCd: String?,
         pageable: Pageable,
     ): Page<AbandonedAnimal>
+
+    @Query(
+        """
+        SELECT a FROM AbandonedAnimal a
+        WHERE a.closedAt IS NULL
+          AND (
+            LOWER(a.kindFullNm) LIKE LOWER(CONCAT('%', :q, '%'))
+            OR LOWER(a.happenPlace) LIKE LOWER(CONCAT('%', :q, '%'))
+            OR LOWER(a.careAddr) LIKE LOWER(CONCAT('%', :q, '%'))
+            OR LOWER(a.careNm) LIKE LOWER(CONCAT('%', :q, '%'))
+            OR LOWER(a.specialMark) LIKE LOWER(CONCAT('%', :q, '%'))
+          )
+        ORDER BY a.happenDt DESC, a.createdAt DESC
+        """,
+    )
+    fun searchByKeyword(
+        @Param("q") q: String,
+        pageable: Pageable,
+    ): Page<AbandonedAnimal>
 }
