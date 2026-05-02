@@ -50,4 +50,26 @@ interface AbandonedAnimalRepository : JpaRepository<AbandonedAnimal, UUID> {
         @Param("q") q: String,
         pageable: Pageable,
     ): Page<AbandonedAnimal>
+
+    /** FULLTEXT + ngram. 2글자 이상 쿼리에 사용. */
+    @Query(
+        value = """
+        SELECT * FROM abandoned_animal
+        WHERE closed_at IS NULL
+          AND MATCH(kind_full_nm, happen_place, care_addr, care_nm, special_mark)
+              AGAINST(:q IN NATURAL LANGUAGE MODE)
+        ORDER BY happen_dt DESC, created_at DESC
+        """,
+        countQuery = """
+        SELECT COUNT(*) FROM abandoned_animal
+        WHERE closed_at IS NULL
+          AND MATCH(kind_full_nm, happen_place, care_addr, care_nm, special_mark)
+              AGAINST(:q IN NATURAL LANGUAGE MODE)
+        """,
+        nativeQuery = true,
+    )
+    fun searchByKeywordFulltext(
+        @Param("q") q: String,
+        pageable: Pageable,
+    ): Page<AbandonedAnimal>
 }

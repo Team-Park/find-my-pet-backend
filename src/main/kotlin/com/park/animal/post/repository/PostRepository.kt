@@ -51,6 +51,29 @@ interface PostRepository :
         @Param("q") q: String,
         pageable: org.springframework.data.domain.Pageable,
     ): org.springframework.data.domain.Page<Post>
+
+    /**
+     * FULLTEXT + ngram parser. 2글자 이상 쿼리에 대해 풀 테이블 스캔 없이 매칭.
+     * NATURAL LANGUAGE MODE — relevance score 순 정렬.
+     */
+    @Query(
+        value = """
+        SELECT * FROM post
+        WHERE deleted_at IS NULL
+          AND MATCH(title, description, place) AGAINST(:q IN NATURAL LANGUAGE MODE)
+        ORDER BY created_at DESC
+        """,
+        countQuery = """
+        SELECT COUNT(*) FROM post
+        WHERE deleted_at IS NULL
+          AND MATCH(title, description, place) AGAINST(:q IN NATURAL LANGUAGE MODE)
+        """,
+        nativeQuery = true,
+    )
+    fun searchByKeywordFulltext(
+        @Param("q") q: String,
+        pageable: org.springframework.data.domain.Pageable,
+    ): org.springframework.data.domain.Page<Post>
 }
 
 interface PostQueryRepository {
