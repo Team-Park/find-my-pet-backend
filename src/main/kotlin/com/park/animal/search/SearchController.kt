@@ -47,16 +47,10 @@ class SearchController(
         var totalLost = 0L
         var totalAbandoned = 0L
 
-        // ngram_token_size=2 미만 쿼리는 FULLTEXT 가 매칭 못 하므로 LIKE 로 fallback.
-        val useFulltext = keyword.length >= 2
-        // BOOLEAN MODE 안전 처리: 특수문자 제거 + 따옴표 감싸 phrase 매칭.
-        val safeQ = keyword.replace(Regex("[+\\-><()~*\"@]"), "")
-        val ftQ = "\"$safeQ\""
-
+        // FULLTEXT + ngram 가 한국어 매칭 0 반환 이슈로 임시 비활성화.
+        // 7000 row 수준에선 LIKE 로 충분 (ms 단위 응답). 추후 서버 변수 점검 후 재활성화.
         if (type == "ALL" || type == "LOST") {
-            val page =
-                if (useFulltext) postRepository.searchByKeywordFulltext(ftQ, pageable)
-                else postRepository.searchByKeyword(keyword, pageable)
+            val page = postRepository.searchByKeyword(keyword, pageable)
             totalLost = page.totalElements
             items += page.content.map {
                 SearchItem(
@@ -72,9 +66,7 @@ class SearchController(
         }
 
         if (type == "ALL" || type == "ABANDONED") {
-            val page =
-                if (useFulltext) abandonedAnimalRepository.searchByKeywordFulltext(ftQ, pageable)
-                else abandonedAnimalRepository.searchByKeyword(keyword, pageable)
+            val page = abandonedAnimalRepository.searchByKeyword(keyword, pageable)
             totalAbandoned = page.totalElements
             items += page.content.map {
                 SearchItem(
