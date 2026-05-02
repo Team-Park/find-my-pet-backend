@@ -49,10 +49,13 @@ class SearchController(
 
         // ngram_token_size=2 미만 쿼리는 FULLTEXT 가 매칭 못 하므로 LIKE 로 fallback.
         val useFulltext = keyword.length >= 2
+        // BOOLEAN MODE 안전 처리: 특수문자 제거 + 따옴표 감싸 phrase 매칭.
+        val safeQ = keyword.replace(Regex("[+\\-><()~*\"@]"), "")
+        val ftQ = "\"$safeQ\""
 
         if (type == "ALL" || type == "LOST") {
             val page =
-                if (useFulltext) postRepository.searchByKeywordFulltext(keyword, pageable)
+                if (useFulltext) postRepository.searchByKeywordFulltext(ftQ, pageable)
                 else postRepository.searchByKeyword(keyword, pageable)
             totalLost = page.totalElements
             items += page.content.map {
@@ -70,7 +73,7 @@ class SearchController(
 
         if (type == "ALL" || type == "ABANDONED") {
             val page =
-                if (useFulltext) abandonedAnimalRepository.searchByKeywordFulltext(keyword, pageable)
+                if (useFulltext) abandonedAnimalRepository.searchByKeywordFulltext(ftQ, pageable)
                 else abandonedAnimalRepository.searchByKeyword(keyword, pageable)
             totalAbandoned = page.totalElements
             items += page.content.map {
