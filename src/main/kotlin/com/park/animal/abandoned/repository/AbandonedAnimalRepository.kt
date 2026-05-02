@@ -51,20 +51,20 @@ interface AbandonedAnimalRepository : JpaRepository<AbandonedAnimal, UUID> {
         pageable: Pageable,
     ): Page<AbandonedAnimal>
 
-    /** FULLTEXT + ngram. 2글자 이상 쿼리에 사용. */
+    /** FULLTEXT + ngram. 2글자 이상 쿼리. BOOLEAN MODE + phrase (호출 측에서 따옴표 래핑). */
     @Query(
         value = """
         SELECT * FROM abandoned_animal
         WHERE closed_at IS NULL
           AND MATCH(kind_full_nm, happen_place, care_addr, care_nm, special_mark)
-              AGAINST(:q IN NATURAL LANGUAGE MODE)
+              AGAINST(:q IN BOOLEAN MODE)
         ORDER BY happen_dt DESC, created_at DESC
         """,
         countQuery = """
         SELECT COUNT(*) FROM abandoned_animal
         WHERE closed_at IS NULL
           AND MATCH(kind_full_nm, happen_place, care_addr, care_nm, special_mark)
-              AGAINST(:q IN NATURAL LANGUAGE MODE)
+              AGAINST(:q IN BOOLEAN MODE)
         """,
         nativeQuery = true,
     )

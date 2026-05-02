@@ -53,20 +53,21 @@ interface PostRepository :
     ): org.springframework.data.domain.Page<Post>
 
     /**
-     * FULLTEXT + ngram parser. 2글자 이상 쿼리에 대해 풀 테이블 스캔 없이 매칭.
-     * NATURAL LANGUAGE MODE — relevance score 순 정렬.
+     * FULLTEXT + ngram parser. 2글자 이상 쿼리에 풀 테이블 스캔 없이 매칭.
+     * BOOLEAN MODE + phrase 형태 — ngram 과 호환성이 NATURAL LANGUAGE MODE 보다 좋음.
+     * 호출 측에서 q 를 따옴표로 감싼 phrase 형태로 넘겨야 함 (특수문자 제거 + "...").
      */
     @Query(
         value = """
         SELECT * FROM post
         WHERE deleted_at IS NULL
-          AND MATCH(title, description, place) AGAINST(:q IN NATURAL LANGUAGE MODE)
+          AND MATCH(title, description, place) AGAINST(:q IN BOOLEAN MODE)
         ORDER BY created_at DESC
         """,
         countQuery = """
         SELECT COUNT(*) FROM post
         WHERE deleted_at IS NULL
-          AND MATCH(title, description, place) AGAINST(:q IN NATURAL LANGUAGE MODE)
+          AND MATCH(title, description, place) AGAINST(:q IN BOOLEAN MODE)
         """,
         nativeQuery = true,
     )
