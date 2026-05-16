@@ -21,9 +21,10 @@ class WebMvcConfig(
     }
 
     override fun addInterceptors(registry: InterceptorRegistry) {
-//        registry
-//            .addInterceptor(passportInterceptor)
-//            .addPathPatterns("/api/**")
+        // F-AUTH-3 default-deny 게이트 (forest 3e9df96 패턴). Resolver만으로는 어노테이션 누락 endpoint를 막지 못함.
+        registry
+            .addInterceptor(passportInterceptor)
+            .addPathPatterns("/api/**")
     }
 
     override fun addCorsMappings(registry: CorsRegistry) {
