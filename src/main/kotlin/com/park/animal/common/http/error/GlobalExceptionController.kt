@@ -6,8 +6,11 @@ import jakarta.servlet.http.HttpServletRequest
 import org.springframework.boot.logging.LogLevel
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.servlet.resource.NoResourceFoundException
 import org.woo.apm.log.log
 import org.woo.http.FailedApiResponseBody
 import org.woo.storagesdk.exception.NotAllowedMimeTypeException
@@ -38,8 +41,25 @@ class GlobalExceptionController {
     fun notAllowedFileType(
         e: NotAllowedMimeTypeException,
         request: HttpServletRequest,
+    ): ResponseEntity<FailedApiResponseBody> = respond(ErrorCode.NOT_ALLOWED_FILE_TYPE, e, request)
+
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun noResourceFound(
+        e: NoResourceFoundException,
+        request: HttpServletRequest,
+    ): ResponseEntity<FailedApiResponseBody> = respond(ErrorCode.NOT_FOUND_ROUTE, e, request)
+
+    @ExceptionHandler(MissingServletRequestParameterException::class, MethodArgumentTypeMismatchException::class)
+    fun missingParameter(
+        e: Exception,
+        request: HttpServletRequest,
+    ): ResponseEntity<FailedApiResponseBody> = respond(ErrorCode.MISSING_PARAMETER, e, request)
+
+    private fun respond(
+        code: ErrorCode,
+        e: Exception,
+        request: HttpServletRequest,
     ): ResponseEntity<FailedApiResponseBody> {
-        val code = ErrorCode.NOT_ALLOWED_FILE_TYPE
         outputLog(errorCode = code, e = e, path = request.requestURI)
         return ResponseEntity.status(code.httpCode).body(code.toFailedResponseBody())
     }

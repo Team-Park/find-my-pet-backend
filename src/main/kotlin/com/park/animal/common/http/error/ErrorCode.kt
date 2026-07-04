@@ -52,6 +52,10 @@ enum class ErrorCode(
     NOT_FOUND_BOOKMARK("즐겨찾기 항목을 찾을 수 없습니다", HttpStatus.BAD_REQUEST, WARN),
     DUPLICATE_BOOKMARK("이미 즐겨찾기에 추가된 게시글입니다", HttpStatus.BAD_REQUEST, WARN),
 
+    // http 공통 — 라우트/파라미터 오류를 500 으로 흘리지 않기 위한 명시 매핑
+    NOT_FOUND_ROUTE("요청한 경로를 찾을 수 없습니다", HttpStatus.NOT_FOUND, WARN),
+    MISSING_PARAMETER("필수 파라미터가 누락되었거나 형식이 잘못되었습니다", HttpStatus.BAD_REQUEST, WARN),
+
     UNKNOWN_ERROR("알 수 없는 에러", HttpStatus.INTERNAL_SERVER_ERROR, ERROR),
 }
 
