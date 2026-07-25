@@ -64,6 +64,7 @@ class SearchGroupCtaTestBeans {
     JpaConfig::class,
     SearchGroupCtaTestBeans::class,
     NotificationService::class,
+    GroupNotificationPublisher::class,
     SearchGroupAccessQueryRepository::class,
     SearchGroupAccessResolver::class,
     SearchGroupEventRecorder::class,

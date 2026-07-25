@@ -29,8 +29,6 @@ import com.park.animal.searchgroup.repository.SearchGroupAccessQueryRepository
 import com.park.animal.searchgroup.repository.SearchGroupEventRepository
 import com.park.animal.searchgroup.repository.SearchGroupMemberRepository
 import com.park.animal.searchgroup.repository.SearchGroupRepository
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -65,9 +63,9 @@ import kotlin.test.assertTrue
 /**
  * 테스트 전용 대체 빈.
  *
- * - `MultimediaService` 는 외부 StorageClient(MinIO) 에 붙으므로 mock 으로 대체한다.
- * - `MeterRegistry` 는 `SearchGroupAccessResolver` 가 주입받는데 `@DataJpaTest` 는
- *   actuator auto-configuration 을 포함하지 않으므로 in-memory 레지스트리를 직접 공급한다.
+ * `MultimediaService` 는 외부 StorageClient(MinIO) 에 붙으므로 mock 으로 대체한다.
+ * `MeterRegistry` 빈은 여기서 만들지 않는다 — `SearchGroupTestMetricsConfig` 가 함께 찾기 IT
+ * 전체가 공유하는 단일 공급처다. 이 클래스에서도 만들면 빈 이름 `meterRegistry` 가 충돌한다.
  *
  * `@DataJpaTest` 는 `@Service` 를 컴포넌트 스캔하지 않으므로 실제 빈과 충돌하지 않는다.
  */
@@ -75,9 +73,6 @@ import kotlin.test.assertTrue
 class SearchLifecycleTestBeans {
     @Bean
     fun multimediaService(): MultimediaService = mock()
-
-    @Bean
-    fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
 }
 
 /**
@@ -93,8 +88,10 @@ class SearchLifecycleTestBeans {
 @Import(
     JpaConfig::class,
     SearchLifecycleTestBeans::class,
+    SearchGroupTestMetricsConfig::class,
     PostNearbyRepository::class,
     NotificationService::class,
+    GroupNotificationPublisher::class,
     BookmarkService::class,
     SearchGroupAccessQueryRepository::class,
     SearchGroupAccessResolver::class,

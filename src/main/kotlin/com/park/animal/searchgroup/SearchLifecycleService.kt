@@ -2,12 +2,10 @@ package com.park.animal.searchgroup
 
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
-import com.park.animal.notification.NotificationService
 import com.park.animal.notification.entity.NotificationType
 import com.park.animal.post.entity.MissingAnimalStatus
 import com.park.animal.post.entity.Post
 import com.park.animal.post.repository.PostRepository
-import com.park.animal.searchgroup.access.SearchGroupAccessResolver
 import com.park.animal.searchgroup.entity.ArchivedReason
 import com.park.animal.searchgroup.entity.JoinPolicy
 import com.park.animal.searchgroup.entity.SearchGroup
@@ -33,25 +31,20 @@ import java.util.UUID
  * | SEEN | 생성하지 않음 | 유지 (archivedReason 에 SEEN 이 없다) | (도달 불가) |
  * | FOUND | post 만 전이 | endSearch | endSearch → 멱등 no-op |
  *
- * **호출 순서 계약**: [SearchGroupAccessResolver] 는 native SQL 이라 auto-flush 되지 않는다.
- * 알림 수신자는 반드시 상태를 바꾸기 **전에** 계산한다.
- *
  * **detach 주의**: [SearchGroupRepository.archiveIfStatus] 는 `clearAutomatically = true` 다.
  * 이 서비스 호출 이후 호출부가 이전에 들고 있던 `Post` 엔티티는 detached 이므로
  * 추가 변경을 하려면 다시 읽어야 한다. 이미 로드된 스칼라 필드 읽기는 안전하다.
  *
- * **TODO(Task 5)**: [endSearch] 의 fan-out 은 아직 레거시 [NotificationService.createMany] 라
- * `notification.group_id` / `post_id` / `actor_user_id` 가 NULL 로 남는다. Task 5 가 이를
- * `GroupNotificationPublisher.notifyGroup(...)` 으로 교체하고, 아래 하드코딩된 제목·본문을
- * `GroupNotificationTemplates` 문구 표로 옮긴다. 그 교체 이후 이 파일에 알림 문구 문자열이 남아 있으면 안 된다.
+ * **알림**: [endSearch] 의 fan-out 은 [GroupNotificationPublisher.notifyGroup] 하나로 처리한다.
+ * 수신자 계산(effectiveMemberIds native SQL)과 문구(`GroupNotificationTemplates`)를 모두
+ * publisher 에 위임하므로, 이 파일에는 알림 문구 문자열이 없다.
  */
 @Service
 class SearchLifecycleService(
     private val searchGroupRepository: SearchGroupRepository,
     private val postRepository: PostRepository,
     private val searchGroupEventRecorder: SearchGroupEventRecorder,
-    private val accessResolver: SearchGroupAccessResolver,
-    private val notificationService: NotificationService,
+    private val notificationPublisher: GroupNotificationPublisher,
 ) {
     /**
      * 실종 소식에 수색그룹을 연다. `SEARCHING` 이 아니면 그룹을 만들지 않고 null 을 돌려준다(설계 §6.1).
@@ -147,9 +140,6 @@ class SearchLifecycleService(
                 ?: throw BusinessException(ErrorCode.NOT_FOUND_SEARCH_GROUP)
         val postId = group.postId
 
-        // 상태를 바꾸기 전에 계산한다 — 접근 판정은 native SQL 이라 auto-flush 되지 않는다.
-        val recipients = accessResolver.effectiveMemberIds(groupId)
-
         val archivedAt = LocalDateTime.now()
         val affected =
             searchGroupRepository.archiveIfStatus(
@@ -178,14 +168,15 @@ class SearchLifecycleService(
             targetId = null,
             detail = "status=ARCHIVED,reason=FOUND",
         )
-        // TODO(Task 5): GroupNotificationPublisher.notifyGroup 으로 교체 — group_id/post_id 를 채운다.
-        notificationService.createMany(
-            userIds = recipients,
-            excludeUserId = actorUserId,
+        // 제목·본문·링크는 GroupNotificationTemplates 표 하나만 쓴다(하드코딩 문구 금지).
+        // 이 호출이 group_id / post_id / actor_user_id 를 채운다 — Task 11 의 알림 검증이 여기에 의존한다.
+        notificationPublisher.notifyGroup(
+            groupId = groupId,
+            postId = postId,
             type = NotificationType.SEARCH_ENDED,
-            title = "수색이 종료됐어요",
-            body = "'${post.title}' 수색이 종료됐어요. 이전 기록만 확인할 수 있어요.",
-            link = "/lost/$postId",
+            excluding = setOf(actorUserId),
+            actorUserId = actorUserId,
+            body = null,
         )
 
         return searchGroupRepository.findByIdAndDeletedAtIsNull(groupId)

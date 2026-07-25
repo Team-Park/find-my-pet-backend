@@ -356,13 +356,15 @@ class PostService(
         val targets = bookmarkers.toSet() - alreadyNotified
         if (targets.isEmpty()) return
 
-        notificationService.createMany(
+        notificationService.createStructuredMany(
             userIds = targets,
-            excludeUserId = actorUserId,
             type = NotificationType.BOOKMARK_STATUS_CHANGED,
             title = "즐겨찾기 게시글 상태가 변경됐어요",
             body = "${post.title} → ${labelOf(status)}",
             link = "/lost/${post.id}",
+            actorUserId = actorUserId,
+            postId = post.id,
+            excludeUserId = actorUserId,
         )
     }
 

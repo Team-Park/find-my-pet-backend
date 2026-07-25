@@ -29,6 +29,11 @@ spring:
       hibernate:
         default_batch_fetch_size: 1000
         dialect: org.hibernate.dialect.MySQLDialect
+        # 알림 fan-out(최대 500행 saveAll) 배치 인서트. id 가 애플리케이션 생성 UUID 라
+        # IDENTITY 생성기와 달리 배치가 실제로 적용된다.
+        order_inserts: true
+        jdbc:
+          batch_size: 50
         # Hibernate 6 은 MySQL 에서 기본적으로 enum → native ENUM 컬럼을 기대한다.
         # 우리 마이그레이션은 VARCHAR 를 사용하므로 호환 위해 VARCHAR 로 고정.
         type:

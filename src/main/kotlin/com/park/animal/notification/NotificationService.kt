@@ -17,6 +17,8 @@ class NotificationService(
 ) {
     /**
      * 알림 1건 생성. 본인이 본인에게 보내는 알림은 [skipSelf] 가 true 면 무시 (같은 [userId]/[actorId]).
+     *
+     * 기존 호출부 계약 유지용 얇은 래퍼다. 신규 코드는 [createStructured] 를 쓴다.
      */
     @Transactional
     fun create(
@@ -27,13 +29,18 @@ class NotificationService(
         link: String? = null,
         actorId: UUID? = null,
         skipSelf: Boolean = true,
-    ): Notification? {
-        if (skipSelf && actorId != null && actorId == userId) return null
-        val n = Notification(userId = userId, type = type, title = title, body = body, link = link)
-        return notificationRepository.save(n)
-    }
+    ): Notification? =
+        createStructured(
+            userId = userId,
+            type = type,
+            title = title,
+            body = body,
+            link = link,
+            actorUserId = actorId,
+            skipSelf = skipSelf,
+        )
 
-    /** 다건(즐겨찾기 fanout 등) 생성. */
+    /** 다건(즐겨찾기 fanout 등) 생성. 신규 코드는 [createStructuredMany] 를 쓴다. */
     @Transactional
     fun createMany(
         userIds: Collection<UUID>,
@@ -42,14 +49,83 @@ class NotificationService(
         body: String? = null,
         link: String? = null,
         excludeUserId: UUID? = null,
+    ) = createStructuredMany(
+        userIds = userIds,
+        type = type,
+        title = title,
+        body = body,
+        link = link,
+        excludeUserId = excludeUserId,
+    )
+
+    /** 구조화 컨텍스트를 포함한 알림 1건 생성 (설계 §9). */
+    @Transactional
+    fun createStructured(
+        userId: UUID,
+        type: NotificationType,
+        title: String,
+        body: String? = null,
+        link: String? = null,
+        actorUserId: UUID? = null,
+        actorName: String? = null,
+        postId: UUID? = null,
+        groupId: UUID? = null,
+        teamId: UUID? = null,
+        skipSelf: Boolean = true,
+    ): Notification? {
+        if (skipSelf && actorUserId != null && actorUserId == userId) return null
+        return notificationRepository.save(
+            Notification(
+                userId = userId,
+                type = type,
+                title = title,
+                body = body,
+                link = link,
+                actorUserId = actorUserId,
+                actorName = actorName,
+                postId = postId,
+                groupId = groupId,
+                teamId = teamId,
+            ),
+        )
+    }
+
+    /**
+     * 구조화 컨텍스트를 포함한 다건 생성. 수신자 중복 제거는 호출부(GroupNotificationPublisher)가
+     * 이미 마쳤지만, 방어적으로 여기서도 Set 으로 좁힌다.
+     */
+    @Transactional
+    fun createStructuredMany(
+        userIds: Collection<UUID>,
+        type: NotificationType,
+        title: String,
+        body: String? = null,
+        link: String? = null,
+        actorUserId: UUID? = null,
+        actorName: String? = null,
+        postId: UUID? = null,
+        groupId: UUID? = null,
+        teamId: UUID? = null,
+        excludeUserId: UUID? = null,
     ) {
         val targets = if (excludeUserId == null) userIds.toSet() else userIds.toSet() - excludeUserId
         if (targets.isEmpty()) return
-        val list =
+        notificationRepository.saveAll(
             targets.map { uid ->
-                Notification(userId = uid, type = type, title = title, body = body, link = link)
-            }
-        notificationRepository.saveAll(list)
+                Notification(
+                    userId = uid,
+                    type = type,
+                    title = title,
+                    body = body,
+                    link = link,
+                    actorUserId = actorUserId,
+                    actorName = actorName,
+                    postId = postId,
+                    groupId = groupId,
+                    teamId = teamId,
+                )
+            },
+        )
     }
 
     @Transactional(readOnly = true)
