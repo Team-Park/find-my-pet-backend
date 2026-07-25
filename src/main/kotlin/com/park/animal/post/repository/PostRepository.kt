@@ -28,6 +28,15 @@ import java.util.UUID
 interface PostRepository :
     JpaRepository<Post, UUID>,
     PostQueryRepository {
+    /**
+     * soft-delete 된 글을 걸러낸 조회.
+     *
+     * Post 는 @SQLDelete 만 있고 @SQLRestriction 이 없어 findById 가 삭제된 글도 그대로 돌려준다(F3).
+     * 함께 찾기 경로(그룹 조회·가입·팀 지원)는 삭제된 실종 소식에 절대 붙으면 안 되므로
+     * 서비스 코드에서는 findById 대신 이 메서드만 쓴다.
+     */
+    fun findByIdAndDeletedAtIsNull(id: UUID): Post?
+
     @Modifying
     @Query("UPDATE Post p SET p.authorName = :newName WHERE p.authorId = :authorId")
     fun updateAuthorName(
