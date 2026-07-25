@@ -42,3 +42,6 @@ out/
 /gradle.properties
 # superpowers worktrees (local only)
 /.worktrees/
+
+# superpowers SDD scratch (local only)
+/.superpowers/
