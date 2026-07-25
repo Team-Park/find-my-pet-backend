@@ -15,6 +15,7 @@ import com.park.animal.searchgroup.entity.SearchGroupMemberStatus
 import com.park.animal.searchgroup.entity.SearchGroupStatus
 import com.park.animal.searchgroup.entity.SearchGroupTeamStatus
 import com.park.animal.searchgroup.repository.SearchGroupAccessQueryRepository
+import com.park.animal.searchgroup.repository.SearchGroupMemberRepository
 import com.park.animal.searchgroup.repository.SearchGroupRepository
 import com.park.animal.team.entity.TeamMemberStatus
 import com.park.animal.team.entity.TeamRole
@@ -39,9 +40,11 @@ import org.testcontainers.utility.DockerImageName
 import java.time.LocalDateTime
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -71,6 +74,8 @@ class SearchGroupMembershipIT {
     @Autowired lateinit var membershipService: SearchGroupMembershipService
 
     @Autowired lateinit var searchGroupRepository: SearchGroupRepository
+
+    @Autowired lateinit var memberRepository: SearchGroupMemberRepository
 
     @Autowired lateinit var transactionManager: PlatformTransactionManager
 
@@ -170,6 +175,33 @@ class SearchGroupMembershipIT {
                 forGroupId.toString(),
             )!!,
         )
+
+    private fun updatedAtOfGroup(forGroupId: UUID): LocalDateTime =
+        jdbcTemplate
+            .queryForObject(
+                "SELECT updated_at FROM search_group WHERE id = ?",
+                java.sql.Timestamp::class.java,
+                forGroupId.toString(),
+            )!!
+            .toLocalDateTime()
+
+    private fun memberStatus(membershipId: UUID): SearchGroupMemberStatus =
+        SearchGroupMemberStatus.valueOf(
+            jdbcTemplate.queryForObject(
+                "SELECT status FROM search_group_member WHERE id = ?",
+                String::class.java,
+                membershipId.toString(),
+            )!!,
+        )
+
+    private fun decidedAtOfMember(membershipId: UUID): LocalDateTime =
+        jdbcTemplate
+            .queryForObject(
+                "SELECT decided_at FROM search_group_member WHERE id = ?",
+                java.sql.Timestamp::class.java,
+                membershipId.toString(),
+            )!!
+            .toLocalDateTime()
 
     /** 팀을 통해서만 권한을 얻은 사용자 — 직접 멤버십 행은 만들지 않는다(설계 §6.6). */
     private fun teamOnlyUser(forGroupId: UUID): UUID {
@@ -286,15 +318,21 @@ class SearchGroupMembershipIT {
 
     @Test
     fun `동시 정책 변경 경합에서 패자도 이미 목표 상태에 도달했으면 예외 없이 성공한다`() {
-        // SearchGroupRepository.updateJoinPolicyFrom 의 계약(0 영향행 = 재조회해서 판단) 을
-        // 서비스가 지키는지 확인한다. "승자" 는 저수준 리포지토리로 직접 전이시키고 커밋을
-        // 일부러 지연시켜, 그 사이 "패자"(실제 검증 대상, membershipService 를 통한 진짜 서비스
-        // 호출)가 같은 목표 정책으로 UPDATE 를 시도하다 승자의 행 잠금에 걸리도록 만든다.
-        // 승자가 커밋하면 패자의 UPDATE 는 0 행에 매칭되지만(WHERE join_policy = 이전값), 이미
-        // 목표 정책에 도달했으므로 패자도 예외 없이 성공해야 한다(멱등 200, 409 아님).
+        // SearchGroupRepository.updateJoinPolicyFrom 의 계약(0 영향행 = confirm 으로 재확인) 을
+        // 서비스가 지키는지 확인한다. "승자" 는 저수준 리포지토리로 직접 전이시키고, 자신의 UPDATE
+        // 가 실제로 실행된 직후(커밋 전) latch 로 신호를 보낸 뒤에야 커밋을 지연시킨다. "패자"
+        // (검증 대상, membershipService 를 통한 진짜 서비스 호출)는 그 신호를 받은 뒤에야 출발
+        // 하므로, 승자가 행을 잠그고 있는 동안 반드시 그 잠금을 만난다 — Thread.sleep 으로 순서를
+        // 추측하지 않는다(관측 가능한 사건으로 순서를 강제한다).
+        //
+        // 패자가 confirm 분기를 실제로 탔는지는 updated_at 으로 직접 검증한다: confirm 은 목표값 →
+        // 목표값 조건부 UPDATE 라 매칭되면 updated_at 을 다시 찍는다. 패자가 (스케줄링 등으로) 이
+        // 레이스에 전혀 참여하지 못하고 그냥 자기 스냅샷으로 조기 반환했다면 updated_at 은 승자의
+        // 캡처값과 같을 것이고, 아래 assertTrue 가 그 경우를 실패로 잡는다.
         val gid = newGroup(newPost(ownerId), JoinPolicy.OPEN)
-        val winnerCommitted = CountDownLatch(1)
+        val winnerUpdateDone = CountDownLatch(1)
         val loserError = AtomicReference<Throwable?>()
+        val updatedAtAfterWinnerUpdate = AtomicReference<LocalDateTime?>()
 
         val winnerThread =
             Thread {
@@ -306,15 +344,19 @@ class SearchGroupMembershipIT {
                         activeStatus = SearchGroupStatus.ACTIVE,
                         now = LocalDateTime.now(),
                     )
+                    // 자신의 쓰기는 커밋 전에도 같은 트랜잭션에서 보인다(read-your-own-writes) —
+                    // 나중에 confirm 이 이 값을 다시 덮어썼는지 비교할 기준점을 여기서 캡처한다.
+                    updatedAtAfterWinnerUpdate.set(searchGroupRepository.findByIdAndDeletedAtIsNull(gid)!!.updatedAt)
+                    winnerUpdateDone.countDown()
                     // 패자가 같은 행에 UPDATE 를 시도해 잠금 대기열에 들어갈 시간을 번다.
                     Thread.sleep(300)
                 }
-                winnerCommitted.countDown()
             }
 
         val loserThread =
             Thread {
                 try {
+                    winnerUpdateDone.await(2, TimeUnit.SECONDS)
                     membershipService.updateJoinPolicy(gid, ownerId, JoinPolicy.APPROVAL_REQUIRED)
                 } catch (e: Throwable) {
                     loserError.set(e)
@@ -322,16 +364,96 @@ class SearchGroupMembershipIT {
             }
 
         winnerThread.start()
-        // 승자가 UPDATE 를 먼저 걸어 행을 잠그도록 약간의 시간을 둔 뒤 패자를 출발시킨다.
-        Thread.sleep(50)
         loserThread.start()
-
         winnerThread.join(5_000)
         loserThread.join(5_000)
-        assertEquals(0L, winnerCommitted.count, "승자 스레드가 끝나지 않았다")
 
         assertNull(loserError.get(), "이미 목표 정책에 도달했다면 패자도 예외 없이 성공해야 한다: ${loserError.get()}")
         assertEquals(JoinPolicy.APPROVAL_REQUIRED, currentJoinPolicy(gid))
+
+        val captured = updatedAtAfterWinnerUpdate.get()
+        assertNotNull(captured, "승자 스레드가 자신의 UPDATE 를 마치지 못했다")
+        assertTrue(
+            updatedAtOfGroup(gid).isAfter(captured),
+            "패자의 confirm UPDATE 가 실행되지 않았다 — updated_at 이 승자 시점과 같다(confirm 분기가 " +
+                "검증되지 않았다는 뜻)",
+        )
+    }
+
+    @Test
+    fun `동시 승인 경합에서 패자도 이미 ACTIVE 에 도달했으면 예외 없이 성공하고 이벤트·알림은 승자만 남긴다`() {
+        // reloadOrConflict 의 confirm 경로(정책 변경 경로와 같은 기법)를 approve() 에서 검증한다.
+        // 순서 통제 방식과 confirm 분기 검증 방식은 위 정책 경합 테스트와 동일 — latch 로 순서를
+        // 강제하고, 실제 갱신 컬럼(여기서는 decided_at)이 승자 이후 한 번 더 찍혔는지로 confirm 이
+        // 실제로 실행됐음을 직접 증명한다.
+        val approvalGroupId = newGroup(newPost(ownerId), JoinPolicy.APPROVAL_REQUIRED)
+        val pending = membershipService.join(approvalGroupId, joinerId, "이참여")
+        val membershipId = pending.membership.membershipId
+
+        val winnerUpdateDone = CountDownLatch(1)
+        val loserError = AtomicReference<Throwable?>()
+        val decidedAtAfterWinnerUpdate = AtomicReference<LocalDateTime?>()
+
+        val winnerThread =
+            Thread {
+                TransactionTemplate(transactionManager).execute {
+                    memberRepository.activate(
+                        membershipId = membershipId,
+                        groupId = approvalGroupId,
+                        expected = SearchGroupMemberStatus.PENDING,
+                        decidedBy = ownerId,
+                        occurredAt = LocalDateTime.now(),
+                    )
+                    decidedAtAfterWinnerUpdate.set(
+                        memberRepository.findByIdAndGroupId(membershipId, approvalGroupId)!!.decidedAt,
+                    )
+                    winnerUpdateDone.countDown()
+                    // 패자가 같은 행에 activate() 를 시도해 잠금 대기열에 들어갈 시간을 번다.
+                    Thread.sleep(300)
+                }
+            }
+
+        val loserThread =
+            Thread {
+                try {
+                    winnerUpdateDone.await(2, TimeUnit.SECONDS)
+                    membershipService.approve(approvalGroupId, membershipId, ownerId)
+                } catch (e: Throwable) {
+                    loserError.set(e)
+                }
+            }
+
+        winnerThread.start()
+        loserThread.start()
+        winnerThread.join(5_000)
+        loserThread.join(5_000)
+
+        assertNull(loserError.get(), "이미 ACTIVE 에 도달했다면 패자도 예외 없이 성공해야 한다: ${loserError.get()}")
+        assertEquals(SearchGroupMemberStatus.ACTIVE, memberStatus(membershipId))
+        // 승자는 실제 서비스가 아니라 저수준 리포지토리로 직접 전이시켰으므로(타이밍을 정확히
+        // 통제하기 위해서) 승자 쪽에서도 이벤트·알림이 없다 — 여기서 증명해야 할 것은 "패자
+        // (confirm 경로)가 추가로 이벤트·알림을 만들지 않는다" 는 것뿐이다. "정상 approve() 호출은
+        // 이벤트·알림을 정확히 1건 남긴다" 는 이미 다른 테스트(`APPROVAL_REQUIRED 는 신청 승인 거절
+        // 양측 알림을 남긴다`)가 증명한다 — 두 테스트를 합치면 "총합은 항상 최대 1건, 그것도 실제
+        // 전이시킨 쪽만" 이 성립한다.
+        assertEquals(
+            0L,
+            eventCount(approvalGroupId, "MEMBER_APPROVED"),
+            "confirm 만 한 패자는 감사 기록을 남기지 않는다(승자도 실제 서비스를 거치지 않아 0건이 맞다)",
+        )
+        assertEquals(
+            0L,
+            notificationCount(joinerId),
+            "confirm 만 한 패자는 알림을 만들지 않는다(승자도 실제 서비스를 거치지 않아 0건이 맞다)",
+        )
+
+        val captured = decidedAtAfterWinnerUpdate.get()
+        assertNotNull(captured, "승자 스레드가 자신의 activate() 를 마치지 못했다")
+        assertTrue(
+            decidedAtOfMember(membershipId).isAfter(captured),
+            "패자의 confirm UPDATE 가 실행되지 않았다 — decided_at 이 승자 시점과 같다(confirm 분기가 " +
+                "검증되지 않았다는 뜻)",
+        )
     }
 
     @Test

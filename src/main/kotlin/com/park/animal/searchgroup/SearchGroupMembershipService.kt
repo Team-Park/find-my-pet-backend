@@ -196,19 +196,23 @@ class SearchGroupMembershipService(
                 decidedBy = ownerUserId,
                 occurredAt = now,
             )
-        val current = reloadOrConflict(groupId, member.id, SearchGroupMemberStatus.REMOVED, affected)
+        val current = reloadOrConflict(groupId, member.id, SearchGroupMemberStatus.REMOVED, affected, ownerUserId)
 
-        eventRecorder.record(groupId, SearchGroupEventType.MEMBER_REMOVED, ownerUserId, member.userId, null)
-        // 행위자·사유를 대상자에게 알리지 않는다 (설계 §6.3).
-        notificationPublisher.notifyUser(
-            userId = member.userId,
-            type = NotificationType.GROUP_MEMBER_REMOVED,
-            actorUserId = null,
-            postId = access.postId,
-            groupId = groupId,
-            teamId = null,
-            body = null,
-        )
+        // affected == 0 이면 이 호출은 confirm(다른 트랜잭션이 이미 REMOVED 로 만든 것을 뒤늦게
+        // 확인)일 뿐 실제 전이를 수행한 게 아니다 — 감사 기록·알림은 실제로 전이시킨 쪽만 남긴다.
+        if (affected != 0) {
+            eventRecorder.record(groupId, SearchGroupEventType.MEMBER_REMOVED, ownerUserId, member.userId, null)
+            // 행위자·사유를 대상자에게 알리지 않는다 (설계 §6.3).
+            notificationPublisher.notifyUser(
+                userId = member.userId,
+                type = NotificationType.GROUP_MEMBER_REMOVED,
+                actorUserId = null,
+                postId = access.postId,
+                groupId = groupId,
+                teamId = null,
+                body = null,
+            )
+        }
         return SearchGroupMembershipResponse.from(current)
     }
 
@@ -259,8 +263,12 @@ class SearchGroupMembershipService(
                 decidedBy = userId,
                 occurredAt = now,
             )
-        val current = reloadOrConflict(groupId, member.id, SearchGroupMemberStatus.LEFT, affected)
-        eventRecorder.record(groupId, SearchGroupEventType.MEMBER_LEFT, userId, userId, null)
+        val current = reloadOrConflict(groupId, member.id, SearchGroupMemberStatus.LEFT, affected, userId)
+        // affected == 0 이면 confirm 뿐이다(다른 요청이 이미 LEFT 로 만들었음을 뒤늦게 확인) — 그
+        // 요청이 이미 이벤트를 남겼으므로 여기서 또 남기지 않는다.
+        if (affected != 0) {
+            eventRecorder.record(groupId, SearchGroupEventType.MEMBER_LEFT, userId, userId, null)
+        }
         return SearchGroupMembershipResponse.from(current)
     }
 
@@ -389,33 +397,72 @@ class SearchGroupMembershipService(
                     occurredAt = now,
                 )
             }
-        val current = reloadOrConflict(groupId, member.id, target, affected)
+        val current = reloadOrConflict(groupId, member.id, target, affected, ownerUserId)
 
-        eventRecorder.record(groupId, eventType, ownerUserId, member.userId, null)
-        notificationPublisher.notifyUser(
-            userId = member.userId,
-            type = notificationType,
-            actorUserId = ownerUserId,
-            postId = access.postId,
-            groupId = groupId,
-            teamId = null,
-            body = null,
-        )
+        // affected == 0 이면 이 호출은 confirm(다른 트랜잭션이 이미 target 으로 만든 것을 뒤늦게
+        // 확인)일 뿐 실제 전이를 수행한 게 아니다 — 실제로 전이시킨 쪽만 감사 기록·알림을 남긴다.
+        // 그렇지 않으면 두 탭이 동시에 같은 결정을 눌렀을 때 이벤트·알림이 두 번 남는다.
+        if (affected != 0) {
+            eventRecorder.record(groupId, eventType, ownerUserId, member.userId, null)
+            notificationPublisher.notifyUser(
+                userId = member.userId,
+                type = notificationType,
+                actorUserId = ownerUserId,
+                postId = access.postId,
+                groupId = groupId,
+                teamId = null,
+                body = null,
+            )
+        }
         return SearchGroupMembershipResponse.from(current)
     }
 
-    /** 영향 행 0 이면 현재 상태를 재조회해 목표 상태면 멱등 성공, 아니면 409. */
+    /**
+     * 영향 행 0 이면(경합에서 진 경우) confirm 으로 재확인해 목표 상태면 멱등 성공, 아니면 409.
+     * 영향 행이 있으면(이 트랜잭션이 실제로 전이시킨 경우) 그 결과를 그대로 재조회해 반환한다 —
+     * 자신이 방금 쓴 값은 REPEATABLE READ 스냅샷과 무관하게 항상 보인다(read-your-own-writes).
+     *
+     * **confirm 이 평범한 SELECT 재조회가 아닌 이유.** 이 메서드를 부르는 모든 경로
+     * (`decide`/`remove`/`leaveMe`)는 이미 `requireOwner`/`requireVisible` 또는 최초 tuple 조회로
+     * 이 트랜잭션의 첫 읽기를 마쳤다 — MySQL(InnoDB) REPEATABLE READ 는 그 순간에 스냅샷을 고정
+     * 하므로, 뒤이은 평범한 `findByIdAndGroupId` 재조회는 방금 다른 트랜잭션이 커밋한 값을 보지
+     * 못하고 그 스냅샷을 그대로 반환한다 — 그래서 "이미 목표 상태" 인데도 오탐 409 가 난다
+     * (`updateJoinPolicy` 에서 실제로 재현·확인한 버그와 같은 종류). 대신 `transition(expected =
+     * target, next = target, ...)` 로 목표값 → 목표값 조건부 UPDATE 를 걸어 InnoDB 의
+     * current-read(락 대기 재개 시 재확인) 규칙을 이용한다 — 매칭되면(1행) 이미 목표 상태라 멱등
+     * 성공, 매칭되지 않으면(0행) 진짜 충돌(409).
+     *
+     * confirm 은 항상 `transition()` 을 쓴다(`activate()` 아님) — target 이 ACTIVE 라도 `activate()`
+     * 를 다시 쓰면 `joinedAt` 이 confirm 시각으로 덮어써져 실제 참여 시각이 훼손된다. `transition()`
+     * 은 status/decidedAt/decidedBy/updatedAt 만 건드리므로 joinedAt 은 안전하다. 대신 confirm 이
+     * 성공하면 `decidedAt`/`updatedAt` 이 실제 결정 시각보다 살짝 늦게 다시 찍히는 부작용은 받아
+     * 들인다(정책 변경 경로의 `updated_at` 갱신과 같은 종류의 비용) — `decidedBy` 는 애초에 그룹당
+     * 보호자가 하나뿐이라 승자와 패자가 같은 행위자이므로 오귀속은 없다.
+     *
+     * confirm 은 실제 상태 전이가 아니므로 감사 기록과 알림은 여기서 절대 남기지 않는다 — 호출부가
+     * `affected != 0` 일 때만 그 두 가지를 남기도록 각자 책임진다(이 메서드는 반환값만 준다).
+     */
     private fun reloadOrConflict(
         groupId: UUID,
         membershipId: UUID,
         target: SearchGroupMemberStatus,
         affected: Int,
+        decidedBy: UUID?,
     ): SearchGroupMember {
-        val current =
-            memberRepository.findByIdAndGroupId(membershipId, groupId)
-                ?: throw BusinessException(ErrorCode.NOT_FOUND_SEARCH_GROUP_MEMBERSHIP)
-        if (affected == 0 && current.status != target) throw BusinessException(ErrorCode.SEARCH_GROUP_STATE_CONFLICT)
-        return current
+        if (affected == 0) {
+            val confirmed =
+                memberRepository.transition(
+                    membershipId = membershipId,
+                    groupId = groupId,
+                    expected = target,
+                    next = target,
+                    decidedBy = decidedBy,
+                    occurredAt = LocalDateTime.now(),
+                )
+            if (confirmed == 0) throw BusinessException(ErrorCode.SEARCH_GROUP_STATE_CONFLICT)
+        }
+        return memberRepository.findByIdAndGroupId(membershipId, groupId)
+            ?: throw BusinessException(ErrorCode.NOT_FOUND_SEARCH_GROUP_MEMBERSHIP)
     }
 
     private fun joinRejection(access: GroupAccess): BusinessException =
