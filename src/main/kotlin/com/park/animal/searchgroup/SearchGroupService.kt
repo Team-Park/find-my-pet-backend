@@ -81,12 +81,17 @@ class SearchGroupService(
                 else -> SearchGroupViewerAction.REQUEST_JOIN
             }
 
+        // UNAVAILABLE 은 차단/종료/목격 세 원인을 하나로 뭉뚱그린 값이다. status/postStatus 를
+        // 그대로 내보내면 그 뭉뚱그림이 무의미해진다 — ACTIVE+SEARCHING 조합은 차단된 뷰어만
+        // 도달할 수 있는 유일한 조합이므로, 값을 그대로 노출하면 그것만으로 차단 여부가 드러난다.
+        val unavailable = action == SearchGroupViewerAction.UNAVAILABLE
+
         return SearchGroupCtaResponse(
             postId = access.postId,
             groupId = access.groupId,
             joinPolicy = access.joinPolicy,
-            status = access.groupStatus,
-            postStatus = access.postStatus,
+            status = if (unavailable) null else access.groupStatus,
+            postStatus = if (unavailable) null else access.postStatus,
             memberCount = activeMemberCount(access.groupId),
             teamCount = activeTeamCount(access.groupId),
             viewerAction = action,

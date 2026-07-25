@@ -1,5 +1,6 @@
 package com.park.animal.searchgroup
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.park.animal.common.config.JpaConfig
 import com.park.animal.common.http.error.ErrorCode
 import com.park.animal.common.http.error.exception.BusinessException
@@ -159,6 +160,35 @@ class SearchGroupCtaIT {
         assertTrue(
             SearchGroupCtaResponse::class.memberProperties.none { it.name.contains("block", ignoreCase = true) },
             "설계 §6.3 / 계약 §9 — CTA 응답에 차단 여부 필드를 두지 않는다",
+        )
+    }
+
+    @Test
+    fun `차단으로 인한 UNAVAILABLE 과 종료로 인한 UNAVAILABLE 은 바이트 단위로 동일한 응답을 낸다`() {
+        // viewerAction=UNAVAILABLE 이어도 status/postStatus 가 그대로 노출되면, 그룹이 ACTIVE·글이
+        // SEARCHING 인 조합은 "차단됐을 때만" 성립하는 유일한 튜플이 되어 차단 사실이 새어나간다.
+        val postId = insertPost(owner)
+        val groupId = insertGroup(postId)
+        insertMember(groupId, UUID.randomUUID(), SearchGroupMemberStatus.ACTIVE)
+        val blocked = UUID.randomUUID()
+        insertBlock(groupId, blocked, owner)
+
+        val blockedResponse = searchGroupService.getCta(postId, blocked)
+        assertEquals(SearchGroupViewerAction.UNAVAILABLE, blockedResponse.viewerAction)
+
+        // 같은 post/group 을 종료 상태로 전환한다 — postId/groupId/joinPolicy/memberCount/teamCount 는
+        // 그대로이므로, 응답 차이가 있다면 오직 status/postStatus(및 그로부터 파생되는 필드)뿐이다.
+        jdbcTemplate.update("UPDATE search_group SET status = 'ARCHIVED' WHERE id = ?", groupId.toString())
+        jdbcTemplate.update("UPDATE post SET missing_animal_status = 'FOUND' WHERE id = ?", postId.toString())
+
+        val archivedViewerResponse = searchGroupService.getCta(postId, UUID.randomUUID())
+        assertEquals(SearchGroupViewerAction.UNAVAILABLE, archivedViewerResponse.viewerAction)
+
+        val mapper = ObjectMapper()
+        assertEquals(
+            mapper.writeValueAsString(blockedResponse),
+            mapper.writeValueAsString(archivedViewerResponse),
+            "차단 사유와 종료 사유가 서로 다른 JSON 을 내면 status/postStatus 조합만으로 차단 여부가 드러난다",
         )
     }
 

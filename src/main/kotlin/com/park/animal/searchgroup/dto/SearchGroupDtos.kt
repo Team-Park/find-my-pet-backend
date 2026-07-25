@@ -45,13 +45,19 @@ enum class SearchGroupViewerAction {
  * 그런 값이 필요하면 공개 `GET /post/{id}` 를 쓴다.
  * **`isBlocked` 같은 필드를 절대 추가하지 않는다** — 차단 여부는 [SearchGroupViewerAction.UNAVAILABLE]
  * 안에 숨어야 하며 비차단 비참여자와 구분 불가해야 한다.
+ *
+ * [status]/[postStatus] 는 `viewerAction == UNAVAILABLE` 이면 항상 `null` 이다. 값을 그대로
+ * 노출하면 `status=ACTIVE ∧ postStatus=SEARCHING` 조합이 "차단됐을 때만" 성립하는 유일한
+ * 튜플이 되어 — 종료된 수색·목격 소식은 이 조합에 도달할 수 없으므로 — status/postStatus
+ * 만으로 차단 여부가 새어나간다(coordinator review, Task 4 fix round). `null` 로 통일하면
+ * 차단·종료·목격 세 원인이 완전히 동일한 JSON 을 낸다.
  */
 data class SearchGroupCtaResponse(
     val postId: UUID,
     val groupId: UUID,
     val joinPolicy: JoinPolicy,
-    val status: SearchGroupStatus,
-    val postStatus: MissingAnimalStatus,
+    val status: SearchGroupStatus?,
+    val postStatus: MissingAnimalStatus?,
     val memberCount: Long,
     val teamCount: Long,
     val viewerAction: SearchGroupViewerAction,

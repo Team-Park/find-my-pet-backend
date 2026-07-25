@@ -235,6 +235,60 @@ class SearchLifecycleIT {
         )
     }
 
+    @Test
+    fun `종료된 수색을 SEEN 으로 되돌리려 해도 410`() {
+        val postId = registerPost(MissingAnimalStatus.SEARCHING, JoinPolicy.OPEN)
+        postService.updateStatus(postId = postId, userId = owner, status = MissingAnimalStatus.FOUND)
+
+        val e =
+            assertFailsWith<BusinessException> {
+                postService.updateStatus(postId = postId, userId = owner, status = MissingAnimalStatus.SEEN)
+            }
+
+        assertEquals(ErrorCode.SEARCH_ALREADY_ENDED, e.errorCode)
+        assertEquals(
+            MissingAnimalStatus.FOUND,
+            postRepository.findByIdAndDeletedAtIsNull(postId)!!.missingAnimalStatus,
+            "거부된 전이가 post 상태를 조용히 SEEN 으로 바꾸면 안 된다 — 그러면 이후 재-FOUND 호출이 " +
+                "endSearch 의 조건부 UPDATE(0행, 이미 ARCHIVED)에 막혀 post 가 SEEN 인 채로 200 을 반환한다",
+        )
+    }
+
+    @Test
+    fun `SEARCHING to FOUND to SEEN 순서에서 SEEN 이 거부돼 상태와 알림이 오염되지 않는다`() {
+        val postId = registerPost(MissingAnimalStatus.SEARCHING, JoinPolicy.OPEN)
+        val groupId = searchGroupRepository.findByPostIdAndDeletedAtIsNull(postId)!!.id
+        val participant = UUID.randomUUID()
+        joinAsActiveMember(groupId, participant)
+        bookmark(participant, postId)
+
+        postService.updateStatus(postId = postId, userId = owner, status = MissingAnimalStatus.FOUND)
+        assertEquals(
+            1,
+            notificationRepository.findAll().count { it.userId == participant },
+            "FOUND 전환에서 유효 참여자는 SEARCH_ENDED 를 정확히 한 건 받는다",
+        )
+
+        assertFailsWith<BusinessException> {
+            postService.updateStatus(postId = postId, userId = owner, status = MissingAnimalStatus.SEEN)
+        }
+
+        val post = postRepository.findByIdAndDeletedAtIsNull(postId)!!
+        assertEquals(MissingAnimalStatus.FOUND, post.missingAnimalStatus, "SEEN 이 거부됐으니 post 는 FOUND 를 유지한다")
+        assertEquals(
+            SearchGroupStatus.ARCHIVED,
+            searchGroupRepository.findByPostIdAndDeletedAtIsNull(postId)!!.status,
+        )
+        assertEquals(
+            1,
+            notificationRepository.findAll().count { it.userId == participant },
+            "SEEN 이 조기에 거부되므로 그 다음 재-FOUND 호출 자체가 일어나지 않는다 — 재-FOUND 가 " +
+                "effectiveMemberIds 를 alreadyNotified 로 계산해 놓고 endSearch 의 조건부 UPDATE 가 " +
+                "0행이라 실제로는 SEARCH_ENDED 를 보내지 않으면서 BOOKMARK_STATUS_CHANGED 도 " +
+                "'이미 알림 받음'으로 억제해 참여자가 아무 알림도 못 받는 상황이 재현되지 않는다",
+        )
+    }
+
     // (c) PUT /post 로도 우회 불가
 
     @Test

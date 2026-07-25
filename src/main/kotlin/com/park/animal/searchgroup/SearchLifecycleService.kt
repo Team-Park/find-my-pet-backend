@@ -112,7 +112,18 @@ class SearchLifecycleService(
                 post.updateStatus(MissingAnimalStatus.SEARCHING)
             }
 
-            MissingAnimalStatus.SEEN -> post.updateStatus(MissingAnimalStatus.SEEN)
+            MissingAnimalStatus.SEEN -> {
+                if (group != null && group.status == SearchGroupStatus.ARCHIVED) {
+                    // 전이 표의 ARCHIVED×SEEN "(도달 불가)" 를 실제로 막는다. 여기서 조용히
+                    // 통과시키면 post 가 ARCHIVED 그룹 아래에서 SEEN 이 되고, 그 다음 재-FOUND
+                    // 호출이 endSearch 의 조건부 UPDATE(이미 ARCHIVED → 0행)에 막혀 post.updateStatus
+                    // 를 건너뛴 채 200 을 반환한다 — post 는 SEEN 인 채로 영원히 남는다(coordinator
+                    // review, Task 4 fix round). SEARCHING 분기와 동일하게 410 으로 막아 그 상태
+                    // 자체를 도달 불가능하게 만든다.
+                    throw BusinessException(ErrorCode.SEARCH_ALREADY_ENDED)
+                }
+                post.updateStatus(MissingAnimalStatus.SEEN)
+            }
         }
     }
 
