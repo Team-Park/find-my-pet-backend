@@ -69,6 +69,7 @@ class SearchGroupCtaTestBeans {
     SearchGroupAccessResolver::class,
     SearchGroupEventRecorder::class,
     SearchLifecycleService::class,
+    SearchGroupMembershipService::class,
     SearchGroupService::class,
 )
 @Testcontainers

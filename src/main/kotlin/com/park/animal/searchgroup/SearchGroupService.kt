@@ -44,6 +44,7 @@ class SearchGroupService(
     private val searchGroupEventRepository: SearchGroupEventRepository,
     private val postRepository: PostRepository,
     private val searchLifecycleService: SearchLifecycleService,
+    private val membershipService: SearchGroupMembershipService,
 ) {
     companion object {
         /** 활동 기록 한 페이지 상한. 설계 §16.7 "서버가 결과 수를 제한한다". */
@@ -207,4 +208,21 @@ class SearchGroupService(
 
     private fun activeTeamCount(groupId: UUID): Long =
         searchGroupTeamRepository.countByGroupIdAndStatus(groupId, SearchGroupTeamStatus.ACTIVE)
+
+    /**
+     * 참여 정책 변경 (엔드포인트 #4, 보호자 전용).
+     *
+     * 실제 전이와 활동 기록은 [SearchGroupMembershipService.updateJoinPolicy] 가 담당하고,
+     * 여기서는 같은 트랜잭션 안에서 변경 후 상세를 다시 만들어 돌려준다.
+     * 알림은 발행하지 않는다 — 설계 §8.3 은 활동 기록만 요구한다.
+     */
+    @Transactional
+    fun updateJoinPolicy(
+        groupId: UUID,
+        ownerUserId: UUID,
+        joinPolicy: JoinPolicy,
+    ): SearchGroupDetailResponse {
+        membershipService.updateJoinPolicy(groupId, ownerUserId, joinPolicy)
+        return getDetail(groupId, ownerUserId)
+    }
 }

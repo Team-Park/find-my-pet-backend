@@ -6,13 +6,16 @@ import com.park.animal.common.config.SwaggerConfig
 import com.park.animal.searchgroup.dto.SearchGroupCtaResponse
 import com.park.animal.searchgroup.dto.SearchGroupDetailResponse
 import com.park.animal.searchgroup.dto.SearchGroupEventResponse
+import com.park.animal.searchgroup.dto.UpdateJoinPolicyRequest
 import dto.Passport
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.security.SecurityRequirement
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -107,5 +110,22 @@ class SearchGroupController(
     ): SucceededApiResponseBody<List<SearchGroupEventResponse>> =
         SucceededApiResponseBody(
             data = searchGroupService.listEvents(groupId, passport.userId, size, offset),
+        )
+
+    @PatchMapping("/search-groups/{groupId}/join-policy")
+    @Operation(
+        summary = "참여 정책 변경 (보호자)",
+        description = "기존 참여자는 그대로 유지되고, 대기 중인 요청도 자동 승인되지 않는다.",
+        security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
+    )
+    fun updateJoinPolicy(
+        @AuthenticationUser
+        @Parameter(hidden = true)
+        passport: Passport,
+        @PathVariable("groupId") groupId: UUID,
+        @RequestBody request: UpdateJoinPolicyRequest,
+    ): SucceededApiResponseBody<SearchGroupDetailResponse> =
+        SucceededApiResponseBody(
+            data = searchGroupService.updateJoinPolicy(groupId, passport.userId, request.joinPolicy),
         )
 }
