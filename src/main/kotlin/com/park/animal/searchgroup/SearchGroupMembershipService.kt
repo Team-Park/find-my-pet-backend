@@ -219,10 +219,17 @@ class SearchGroupMembershipService(
      * 1. 그룹이 보이지 않으면 404.
      * 2. **차단이 활성이면 403** — 설계 §6.3 "차단이 활성인 동안 모든 접근 거부" 이므로 탈퇴도 막힌다.
      *    `requireRead` 를 통째로 쓰지 않는 이유는 그것이 이미 떠난 사용자(role = NONE)까지 403 으로
-     *    만들어 "이미 종료한 참여의 재종료 = 409" 규칙과 어긋나기 때문이다. 차단 판정만 동일하게 적용한다.
+     *    만들어 "이미 LEFT 인 참여의 재종료 = 멱등 200" 규칙과 어긋나기 때문이다. 차단 판정만 동일하게
+     *    적용한다.
      * 3. 직접 멤버십 행이 없으면 404 — 보호자와 팀 경유 사용자가 여기에 해당한다.
      *    팀을 통해 권한을 얻은 사용자는 이 경로로 나갈 수 없다(설계 §6.6, 팀 지원 종료로만 사라진다).
-     * 4. ACTIVE/PENDING 이 아니면 409.
+     * 4. **이미 LEFT 면 같은 행을 그대로 반환한다(멱등 200, 재전이·재이벤트 없음)** — 계약 §16 은
+     *    "도달 가능한 목표 상태에 이미 있으면 항상 200, 409 는 그 상태에 도달할 수 없을 때만" 을
+     *    요구한다. 재탈퇴는 정확히 그 경우이고, 이는 경합이 아니라 평범한 순차 재시도(두 번째 탭 클릭)
+     *    에서도 일어난다 — `reloadOrConflict` 가 처리하는 것은 두 요청이 동시에 전이를 다툴 때의
+     *    "이미 LEFT" 뿐이고, 이 앞단 가드는 애초에 전이를 시도하지도 않는 "이미 LEFT" 를 잡는다.
+     * 5. ACTIVE/PENDING/LEFT 어느 것도 아니면(REJECTED/REMOVED) 409 — 이 둘은 보호자가 강제한
+     *    상태라 사용자가 스스로 "탈퇴를 마무리" 할 수 있는 상태가 아니다.
      */
     @Transactional
     fun leaveMe(
@@ -235,6 +242,9 @@ class SearchGroupMembershipService(
         val member =
             memberRepository.findByGroupIdAndUserId(groupId, userId)
                 ?: throw BusinessException(ErrorCode.NOT_FOUND_SEARCH_GROUP_MEMBERSHIP)
+        if (member.status == SearchGroupMemberStatus.LEFT) {
+            return SearchGroupMembershipResponse.from(member)
+        }
         if (member.status != SearchGroupMemberStatus.ACTIVE && member.status != SearchGroupMemberStatus.PENDING) {
             throw BusinessException(ErrorCode.SEARCH_GROUP_STATE_CONFLICT)
         }
@@ -288,6 +298,21 @@ class SearchGroupMembershipService(
      * 기존 ACTIVE 참여자는 그대로 유지하고, PENDING 을 자동 승인하지 않는다(설계 §8.3).
      * 변경 사실은 활동 기록에만 남기고 **알림은 보내지 않는다** — 설계 §8.3 이 요구하는 것은
      * 그룹 활동 기록뿐이고 §9 수신자 표에 이 항목이 없다.
+     *
+     * `SearchGroupRepository.updateJoinPolicyFrom` 의 계약은 "영향 행 0 이면 호출부가 재조회해서
+     * 멱등/409 를 가른다" 다(그 리포지토리 KDoc 참고) — 이 클래스의 다른 모든 쓰기 경로가
+     * `reloadOrConflict` 로 지키는 규칙을 여기서도 똑같이 지킨다. 동시에 같은 목표 정책으로 PATCH 한
+     * 두 탭 중 나중에 UPDATE 를 시도한 쪽은 영향 행이 0 이 되지만, 그 시점에 정책이 이미 원하는
+     * 값이라면 그 요청도 409 가 아니라 성공이어야 한다.
+     *
+     * **평범한 재조회(SELECT)를 쓰지 않는 이유.** 이 메서드는 이미 `requireOwner` 로 트랜잭션의
+     * 첫 읽기를 했다 — MySQL(InnoDB) REPEATABLE READ 는 그 순간에 스냅샷을 고정하므로, 뒤이은
+     * 평범한 `findByIdAndDeletedAtIsNull` 재조회는 방금 다른 트랜잭션이 커밋한 값을 보지 못하고
+     * 그 스냅샷을 그대로 반환한다 — 그래서 "이미 목표 상태" 인데도 오탐 409 가 난다. 반면 조건부
+     * UPDATE 는 WHERE 절을 평가할 때 최신 커밋 데이터로 다시 확인한다(락 대기 후 재개할 때의
+     * InnoDB current-read 규칙, "lost update" 방지 목적). 그래서 재조회 대신 "목표값 → 목표값"
+     * 조건부 UPDATE(no-op 성격)로 현재 상태를 확인한다 — 매칭되면(1행) 이미 목표 상태라 멱등
+     * 성공, 매칭되지 않으면(0행) 그룹이 다른 정책이거나 보관됐다는 뜻이라 진짜 충돌(409)이다.
      */
     @Transactional
     fun updateJoinPolicy(
@@ -306,7 +331,18 @@ class SearchGroupMembershipService(
                 activeStatus = SearchGroupStatus.ACTIVE,
                 now = LocalDateTime.now(),
             )
-        if (affected == 0) throw BusinessException(ErrorCode.SEARCH_GROUP_STATE_CONFLICT)
+        if (affected == 0) {
+            val confirmed =
+                searchGroupRepository.updateJoinPolicyFrom(
+                    groupId = groupId,
+                    expected = joinPolicy,
+                    next = joinPolicy,
+                    activeStatus = SearchGroupStatus.ACTIVE,
+                    now = LocalDateTime.now(),
+                )
+            if (confirmed == 0) throw BusinessException(ErrorCode.SEARCH_GROUP_STATE_CONFLICT)
+            return
+        }
 
         eventRecorder.record(
             groupId,

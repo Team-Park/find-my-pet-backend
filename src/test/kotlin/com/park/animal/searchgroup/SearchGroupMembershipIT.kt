@@ -12,7 +12,12 @@ import com.park.animal.post.repository.PostRepository
 import com.park.animal.searchgroup.access.SearchGroupAccessResolver
 import com.park.animal.searchgroup.entity.JoinPolicy
 import com.park.animal.searchgroup.entity.SearchGroupMemberStatus
+import com.park.animal.searchgroup.entity.SearchGroupStatus
+import com.park.animal.searchgroup.entity.SearchGroupTeamStatus
 import com.park.animal.searchgroup.repository.SearchGroupAccessQueryRepository
+import com.park.animal.searchgroup.repository.SearchGroupRepository
+import com.park.animal.team.entity.TeamMemberStatus
+import com.park.animal.team.entity.TeamRole
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -23,16 +28,21 @@ import org.springframework.data.domain.PageRequest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.MySQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
 import org.testcontainers.utility.DockerImageName
 import java.time.LocalDateTime
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -59,6 +69,10 @@ class SearchGroupMembershipIT {
     @Autowired lateinit var notificationRepository: NotificationRepository
 
     @Autowired lateinit var membershipService: SearchGroupMembershipService
+
+    @Autowired lateinit var searchGroupRepository: SearchGroupRepository
+
+    @Autowired lateinit var transactionManager: PlatformTransactionManager
 
     @Autowired lateinit var jdbcTemplate: JdbcTemplate
 
@@ -136,6 +150,51 @@ class SearchGroupMembershipIT {
         notificationRepository
             .findByUserIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(userId, PageRequest.of(0, 50))
             .totalElements
+
+    private fun eventCount(
+        forGroupId: UUID,
+        type: String,
+    ): Long =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM search_group_event WHERE group_id = ? AND type = ?",
+            Long::class.java,
+            forGroupId.toString(),
+            type,
+        )!!
+
+    private fun currentJoinPolicy(forGroupId: UUID): JoinPolicy =
+        JoinPolicy.valueOf(
+            jdbcTemplate.queryForObject(
+                "SELECT join_policy FROM search_group WHERE id = ?",
+                String::class.java,
+                forGroupId.toString(),
+            )!!,
+        )
+
+    /** 팀을 통해서만 권한을 얻은 사용자 — 직접 멤버십 행은 만들지 않는다(설계 §6.6). */
+    private fun teamOnlyUser(forGroupId: UUID): UUID {
+        val teamId = UUID.randomUUID()
+        val leaderId = UUID.randomUUID()
+        val member = UUID.randomUUID()
+        jdbcTemplate.update(
+            "INSERT INTO team (id, name, description, status, created_by, created_at, updated_at) " +
+                "VALUES (?, '테스트 팀', NULL, 'ACTIVE', ?, NOW(6), NOW(6))",
+            teamId.toString(), leaderId.toString(),
+        )
+        jdbcTemplate.update(
+            "INSERT INTO team_member (id, team_id, user_id, user_name, role, status, created_at, updated_at) " +
+                "VALUES (?, ?, ?, NULL, ?, ?, NOW(6), NOW(6))",
+            UUID.randomUUID().toString(), teamId.toString(), member.toString(),
+            TeamRole.MEMBER.name, TeamMemberStatus.ACTIVE.name,
+        )
+        jdbcTemplate.update(
+            "INSERT INTO search_group_team (id, group_id, team_id, status, requested_by, requested_at, " +
+                "created_at, updated_at) VALUES (?, ?, ?, ?, ?, NOW(6), NOW(6), NOW(6))",
+            UUID.randomUUID().toString(), forGroupId.toString(), teamId.toString(),
+            SearchGroupTeamStatus.ACTIVE.name, leaderId.toString(),
+        )
+        return member
+    }
 
     @Test
     fun `OPEN 정책은 즉시 참여시키고 보호자에게 알림 1건을 남긴다`() {
@@ -226,6 +285,56 @@ class SearchGroupMembershipIT {
     }
 
     @Test
+    fun `동시 정책 변경 경합에서 패자도 이미 목표 상태에 도달했으면 예외 없이 성공한다`() {
+        // SearchGroupRepository.updateJoinPolicyFrom 의 계약(0 영향행 = 재조회해서 판단) 을
+        // 서비스가 지키는지 확인한다. "승자" 는 저수준 리포지토리로 직접 전이시키고 커밋을
+        // 일부러 지연시켜, 그 사이 "패자"(실제 검증 대상, membershipService 를 통한 진짜 서비스
+        // 호출)가 같은 목표 정책으로 UPDATE 를 시도하다 승자의 행 잠금에 걸리도록 만든다.
+        // 승자가 커밋하면 패자의 UPDATE 는 0 행에 매칭되지만(WHERE join_policy = 이전값), 이미
+        // 목표 정책에 도달했으므로 패자도 예외 없이 성공해야 한다(멱등 200, 409 아님).
+        val gid = newGroup(newPost(ownerId), JoinPolicy.OPEN)
+        val winnerCommitted = CountDownLatch(1)
+        val loserError = AtomicReference<Throwable?>()
+
+        val winnerThread =
+            Thread {
+                TransactionTemplate(transactionManager).execute {
+                    searchGroupRepository.updateJoinPolicyFrom(
+                        groupId = gid,
+                        expected = JoinPolicy.OPEN,
+                        next = JoinPolicy.APPROVAL_REQUIRED,
+                        activeStatus = SearchGroupStatus.ACTIVE,
+                        now = LocalDateTime.now(),
+                    )
+                    // 패자가 같은 행에 UPDATE 를 시도해 잠금 대기열에 들어갈 시간을 번다.
+                    Thread.sleep(300)
+                }
+                winnerCommitted.countDown()
+            }
+
+        val loserThread =
+            Thread {
+                try {
+                    membershipService.updateJoinPolicy(gid, ownerId, JoinPolicy.APPROVAL_REQUIRED)
+                } catch (e: Throwable) {
+                    loserError.set(e)
+                }
+            }
+
+        winnerThread.start()
+        // 승자가 UPDATE 를 먼저 걸어 행을 잠그도록 약간의 시간을 둔 뒤 패자를 출발시킨다.
+        Thread.sleep(50)
+        loserThread.start()
+
+        winnerThread.join(5_000)
+        loserThread.join(5_000)
+        assertEquals(0L, winnerCommitted.count, "승자 스레드가 끝나지 않았다")
+
+        assertNull(loserError.get(), "이미 목표 정책에 도달했다면 패자도 예외 없이 성공해야 한다: ${loserError.get()}")
+        assertEquals(JoinPolicy.APPROVAL_REQUIRED, currentJoinPolicy(gid))
+    }
+
+    @Test
     fun `다른 그룹의 membershipId 로 승인하면 404 다 (IDOR)`() {
         val otherOwnerId = UUID.randomUUID()
         val otherGroupId = newGroup(newPost(otherOwnerId), JoinPolicy.APPROVAL_REQUIRED)
@@ -259,14 +368,37 @@ class SearchGroupMembershipIT {
 
     @Test
     fun `팀 경유 사용자는 개인 참여 종료로 나갈 수 없다`() {
-        val e = assertFailsWith<BusinessException> { membershipService.leaveMe(groupId, UUID.randomUUID()) }
+        // 설계 §6.6 — 팀원은 search_group_member 에 행을 갖지 않는다. 권한은 ACTIVE 팀지원 +
+        // ACTIVE 팀 멤버십에서만 파생되므로, 직접 멤버십이 없는 이 사용자에게 leaveMe 는 404 다.
+        val teamMemberUserId = teamOnlyUser(groupId)
+
+        val e = assertFailsWith<BusinessException> { membershipService.leaveMe(groupId, teamMemberUserId) }
         assertEquals(ErrorCode.NOT_FOUND_SEARCH_GROUP_MEMBERSHIP, e.errorCode)
     }
 
     @Test
-    fun `이미 종료한 참여를 다시 종료하면 409 다`() {
-        membershipService.join(groupId, joinerId, "이참여")
-        membershipService.leaveMe(groupId, joinerId)
+    fun `이미 LEFT 인 참여를 다시 종료해도 멱등 200 이고 같은 행 그대로다`() {
+        // 계약 §16 — 도달 가능한 목표 상태에 이미 있으면 항상 200. 재탈퇴는 새 전이도, 새 이벤트도
+        // 만들지 않는다. 409 는 "그 상태에 도달할 수 없을 때"(REJECTED/REMOVED)만 쓴다.
+        val joined = membershipService.join(groupId, joinerId, "이참여")
+        val firstLeave = membershipService.leaveMe(groupId, joinerId)
+        assertEquals(SearchGroupMemberStatus.LEFT, firstLeave.status)
+        assertEquals(1L, eventCount(groupId, "MEMBER_LEFT"))
+
+        val secondLeave = membershipService.leaveMe(groupId, joinerId)
+
+        assertEquals(joined.membership.membershipId, secondLeave.membershipId)
+        assertEquals(SearchGroupMemberStatus.LEFT, secondLeave.status)
+        assertEquals(1L, memberRowCount(joinerId), "재종료가 새 행을 만들면 안 된다")
+        assertEquals(1L, eventCount(groupId, "MEMBER_LEFT"), "멱등 재종료는 두 번째 활동 기록을 남기면 안 된다")
+    }
+
+    @Test
+    fun `내보내진 참여자는 개인 참여 종료로 재종료할 수 없다`() {
+        // REMOVED 는 보호자가 강제한 상태다 — 사용자가 스스로 "탈퇴를 마무리" 할 수 있는 상태가
+        // 아니므로 LEFT 와 달리 계속 409 다.
+        val joined = membershipService.join(groupId, joinerId, "이참여")
+        membershipService.remove(groupId, joined.membership.membershipId, ownerId)
 
         val e = assertFailsWith<BusinessException> { membershipService.leaveMe(groupId, joinerId) }
         assertEquals(ErrorCode.SEARCH_GROUP_STATE_CONFLICT, e.errorCode)
