@@ -13,6 +13,7 @@ import com.park.animal.post.dto.RegisterPostCommand
 import com.park.animal.post.dto.SummarizedPostsByPageQuery
 import com.park.animal.post.dto.UpdatePostRequest
 import com.park.animal.post.entity.MissingAnimalStatus
+import com.park.animal.searchgroup.entity.JoinPolicy
 import dto.Passport
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -106,6 +107,12 @@ class PostController(
     @PostMapping(path = ["/post"], consumes = ["multipart/form-data", "application/json"])
     @Operation(
         summary = "게시글 등록 API",
+        description =
+            "실종 소식 등록. missingAnimalStatus 가 SEARCHING 이면 수색그룹이 함께 하나 생성된다.\n" +
+                "joinPolicy 는 직접 참여 정책이며 기본값은 OPEN(자유롭게 참여), 다른 값은 " +
+                "APPROVAL_REQUIRED(승인 후 참여) 뿐이다.\n" +
+                "주의: enum 파라미터 변환은 대소문자를 구분한다(대문자만 허용). 'open' 같은 오타는 " +
+                "MethodArgumentTypeMismatchException → 400 MISSING_PARAMETER 로 응답한다.",
         security = [SecurityRequirement(name = SwaggerConfig.AUTHORIZATION_BEARER_SECURITY_SCHEME_NAME)],
     )
     suspend fun registerPost(
@@ -129,6 +136,7 @@ class PostController(
         @RequestParam missingAnimalStatus: MissingAnimalStatus,
         @RequestParam(required = false, defaultValue = "DOG") animalType: AnimalType,
         @RequestParam(required = false) breedId: UUID?,
+        @RequestParam(required = false, defaultValue = "OPEN") joinPolicy: JoinPolicy,
     ): SucceededApiResponseBody<Void> {
         val resolvedUserName =
             if (customNickname != null && passport.role == Role.ROLE_ADMIN) {
@@ -155,6 +163,7 @@ class PostController(
                 animalType = animalType,
                 breedId = breedId,
                 applicationId = passport.signInApplicationId,
+                joinPolicy = joinPolicy,
             )
         postService.registerPost(command)
         return SucceededApiResponseBody(data = null)
