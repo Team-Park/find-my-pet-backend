@@ -242,6 +242,45 @@ class SearchGroupAccessResolverIT {
     }
 
     @Test
+    fun `보호자를 겨냥한 차단 행이 있어도 보호자는 차단되지 않는다 - resolve`() {
+        val postId = insertPost(owner)
+        val groupId = insertGroup(postId)
+        // 계약 §9 — 보호자 자신은 차단 대상이 될 수 없다. 그럼에도 남아 있는(혹은 실수로 생긴)
+        // 차단 행이 보호자 자신의 접근을 지워버리면 조용히 실패하는 거절(오탐 403/404)이 된다.
+        insertBlock(groupId, owner, UUID.randomUUID())
+
+        val access = resolver.resolve(groupId, owner)!!
+
+        assertEquals(GroupRole.OWNER, access.role)
+        assertFalse(access.blocked, "보호자를 겨냥한 차단 행은 무시해야 한다(SearchGroupAccessResolver.toAccess 의 !isOwner 예외)")
+        assertTrue(access.canRead)
+        assertTrue(access.canWrite)
+        assertTrue(access.canManage)
+    }
+
+    @Test
+    fun `effectiveMemberIds 는 보호자를 겨냥한 차단 행이 있어도 보호자를 포함한다`() {
+        val postId = insertPost(owner)
+        val groupId = insertGroup(postId)
+        insertBlock(groupId, owner, UUID.randomUUID())
+
+        val ids = resolver.effectiveMemberIds(groupId)
+
+        assertTrue(owner in ids, "EFFECTIVE_MEMBER_SQL 의 owner-exemption 절이 없으면 보호자 자신이 유효 참여자에서 빠진다")
+    }
+
+    @Test
+    fun `accessibleGroupIds 는 보호자를 겨냥한 차단 행이 있어도 그 그룹을 포함한다`() {
+        val postId = insertPost(owner)
+        val groupId = insertGroup(postId)
+        insertBlock(groupId, owner, UUID.randomUUID())
+
+        val ids = resolver.accessibleGroupIds(owner)
+
+        assertTrue(groupId in ids, "ACCESSIBLE_GROUP_SQL 의 owner-exemption 절이 없으면 보호자 자신의 마이페이지 허브에서 그룹이 사라진다")
+    }
+
+    @Test
     fun `soft-delete 된 post 의 그룹은 보이지 않는다 - 404`() {
         val postId = insertPost(owner, deleted = true)
         val groupId = insertGroup(postId)
