@@ -108,7 +108,7 @@ src/main/kotlin/com/park/animal/
 | 파일 | 변경 |
 |---|---|
 | `.github/workflows/ci.yml` | 백엔드 테스트 job 추가 (Task 0) |
-| `common/http/error/ErrorCode.kt` | 함께 찾기 ErrorCode 12개 추가 (Task 1) |
+| `common/http/error/ErrorCode.kt` | 함께 찾기 ErrorCode 11개 추가 (Task 1) |
 | `common/http/error/GlobalExceptionController.kt` | `HttpMessageNotReadableException` · `MissingRequestHeaderException` 매핑 추가 (Task 1) |
 | `notification/repository/NotificationRepository.kt` | 정렬 tiebreaker (Task 1) |
 | `notification/NotificationService.kt` | 정렬 tiebreaker (Task 1), `createStructured*` 추가 (Task 5) |
@@ -438,7 +438,7 @@ SearchFulltextIT 결과 XML 을 카나리아로 검사해 '0건 실행/skip' 상
 
 Task 2 이후 모든 서비스가 던질 `BusinessException(ErrorCode.*)` 의 어휘와 HTTP 상태를 먼저 확정한다. 동시에 지금 500 으로 새는 두 종류의 바인딩 예외(F9/F10)와 알림 목록 정렬 tiebreaker(F20)를 함께 고친다. 셋 다 "함께 찾기" 가 새로 만들 요청 형태(JSON body 를 받는 POST/PATCH, 그룹 알림 대량 생성)에서 곧바로 터질 것들이다.
 
-**이미 있는 것을 다시 만들지 않는다.** `ErrorCode.kt:55-57` 에 `NOT_FOUND_ROUTE`(404) 와 `MISSING_PARAMETER`(400) 가 **이미 선언돼 있고**, `GlobalExceptionController.kt:7-8` 에 `HttpStatus`·`ResponseEntity` import 도 **이미 있다**. 이 태스크가 추가하는 것은 "함께 찾기" ErrorCode **12개**와 import **2줄**뿐이다. 기존 상수를 다시 쓰면 Kotlin 이 `Conflicting declarations` 로, import 를 다시 쓰면 `Conflicting import` 로 컴파일을 거부한다.
+**이미 있는 것을 다시 만들지 않는다.** `ErrorCode.kt:55-57` 에 `NOT_FOUND_ROUTE`(404) 와 `MISSING_PARAMETER`(400) 가 **이미 선언돼 있고**, `GlobalExceptionController.kt:7-8` 에 `HttpStatus`·`ResponseEntity` import 도 **이미 있다**. 이 태스크가 추가하는 것은 "함께 찾기" ErrorCode **11개**와 import **2줄**뿐이다. 기존 상수를 다시 쓰면 Kotlin 이 `Conflicting declarations` 로, import 를 다시 쓰면 `Conflicting import` 로 컴파일을 거부한다.
 
 **`MISSING_PARAMETER` 와 `INVALID_COLLABORATION_INPUT` 의 사용 경계 (Task 3~12 전체에 적용되는 규약).** 둘 다 400 이지만 발생 계층이 다르고, 이 경계는 Task 12 의 api-spec 이 그대로 문서화한다.
 - **`MISSING_PARAMETER` = 요청이 컨트롤러 메서드 시그니처에 바인딩되지 못한 경우.** 필수 query/path 파라미터 누락, `UUID`/enum 문자열 변환 실패(예: `joinPolicy=WHATEVER`), 깨진 JSON, Kotlin non-null 필드 누락, 필수 헤더 누락. 전부 Spring 이 던지는 예외를 `GlobalExceptionController.missingParameter` 가 잡아 자동으로 만든다. **서비스 코드가 이 코드를 직접 `throw` 하는 일은 없다.**
@@ -446,7 +446,7 @@ Task 2 이후 모든 서비스가 던질 `BusinessException(ErrorCode.*)` 의 �
 - 따라서 "잘못된 enum 값을 보냈다" 는 **항상** `MISSING_PARAMETER` 이지 `INVALID_COLLABORATION_INPUT` 이 아니다. 반대로 "이름이 1글자다" 는 **항상** `INVALID_COLLABORATION_INPUT` 이다.
 
 **Files:**
-- Modify: `src/main/kotlin/com/park/animal/common/http/error/ErrorCode.kt:58-59` (`UNKNOWN_ERROR` 앞에 12개 추가. 55~57행은 손대지 않는다)
+- Modify: `src/main/kotlin/com/park/animal/common/http/error/ErrorCode.kt:58-59` (`UNKNOWN_ERROR` 앞에 11개 추가. 55~57행은 손대지 않는다)
 - Modify: `src/main/kotlin/com/park/animal/common/http/error/GlobalExceptionController.kt:8-9, 52-56` (import 2줄 추가 + `@ExceptionHandler` 목록 확장)
 - Modify: `src/main/kotlin/com/park/animal/notification/repository/NotificationRepository.kt:13-16` (파생 쿼리명에 `IdDesc` tiebreaker 추가)
 - Modify: `src/main/kotlin/com/park/animal/notification/NotificationService.kt:10, 56-67` (`Sort` import 제거 + 새 파생 쿼리 호출)
@@ -888,13 +888,13 @@ Expected: PASS — `BUILD SUCCESSFUL`.
 - [ ] **Step 5: 커밋**
 
 ```bash
-cd /Users/park/Desktop/project/animal && git add src/main/kotlin/com/park/animal/common/http/error/ErrorCode.kt src/main/kotlin/com/park/animal/common/http/error/GlobalExceptionController.kt src/main/kotlin/com/park/animal/notification/repository/NotificationRepository.kt src/main/kotlin/com/park/animal/notification/NotificationService.kt src/test/kotlin/com/park/animal/common/http/error/GlobalExceptionMappingTest.kt src/test/kotlin/com/park/animal/notification/NotificationOrderingTest.kt && git commit -m "fix(http): 본문·헤더 바인딩 예외 400 매핑 + 함께 찾기 ErrorCode 12종 + 알림 정렬 tiebreaker
+cd /Users/park/Desktop/project/animal && git add src/main/kotlin/com/park/animal/common/http/error/ErrorCode.kt src/main/kotlin/com/park/animal/common/http/error/GlobalExceptionController.kt src/main/kotlin/com/park/animal/notification/repository/NotificationRepository.kt src/main/kotlin/com/park/animal/notification/NotificationService.kt src/test/kotlin/com/park/animal/common/http/error/GlobalExceptionMappingTest.kt src/test/kotlin/com/park/animal/notification/NotificationOrderingTest.kt && git commit -m "fix(http): 본문·헤더 바인딩 예외 400 매핑 + 함께 찾기 ErrorCode 11종 + 알림 정렬 tiebreaker
 
 - HttpMessageNotReadableException(F9) / MissingRequestHeaderException(F10) 이
   핸들러에 없어 500 으로 떨어지던 것을 400 MISSING_PARAMETER 로 매핑.
   이 레포에는 spring-boot-starter-validation 이 없어(F11) 본문 형태 오류를
   400 으로 만드는 지점이 여기뿐이다.
-- 설계 15 표에 맞춰 수색그룹/팀 ErrorCode 12개 추가(404/403/409/410/400).
+- 설계 15 표에 맞춰 수색그룹/팀 ErrorCode 11개 추가(404/403/409/410/400).
   기존 NOT_FOUND_ROUTE/MISSING_PARAMETER 는 이미 있어 재선언하지 않는다.
   legacy NOT_FOUND_* 의 400 관례도 소급 변경하지 않는다.
   400 경계: 바인딩 실패=MISSING_PARAMETER, 서비스 검증 실패=INVALID_COLLABORATION_INPUT.
@@ -14803,7 +14803,7 @@ git commit -m "test(search-group): 권한 행렬 / IDOR / 동시성 / 개인정�
 - Judgement only: `../../marketing/services/find-my-pet/feature-truth.md`
 
 **Interfaces:**
-- Consumes: Task 1~11 의 실제 산출물 — `ErrorCode` 신규 12개, `NotificationType` 신규 20개 상수, 계약 §8 의 엔드포인트 32개 + R9 의 `POST /teams/{teamId}/archive`(#33), `V12__add_search_group_and_team.sql`, 각 도메인 응답 DTO(`SearchGroupCtaResponse`, `SearchGroupDetailResponse`, `SearchGroupEventResponse`, `SearchGroupMembershipResponse`, `JoinSearchGroupResponse`, `SearchGroupBlockResponse`, `SearchGroupTeamSupportResponse`, `TeamResponse`, `TeamSummaryResponse`, `TeamMembershipResponse`, `SearchHubResponse`).
+- Consumes: Task 1~11 의 실제 산출물 — `ErrorCode` 신규 11개, `NotificationType` 신규 20개 상수, 계약 §8 의 엔드포인트 32개 + R9 의 `POST /teams/{teamId}/archive`(#33), `V12__add_search_group_and_team.sql`, 각 도메인 응답 DTO(`SearchGroupCtaResponse`, `SearchGroupDetailResponse`, `SearchGroupEventResponse`, `SearchGroupMembershipResponse`, `JoinSearchGroupResponse`, `SearchGroupBlockResponse`, `SearchGroupTeamSupportResponse`, `TeamResponse`, `TeamSummaryResponse`, `TeamMembershipResponse`, `SearchHubResponse`).
 - Produces: 프런트엔드/게이트웨이가 참조하는 제품 계약 문서. 이후 마케팅 `feature-truth.md` 동기화의 입력.
 
 > `/Users/park/Desktop/project/prd` 는 git 저장소가 아니다(`git rev-parse --show-toplevel` 실패, 상위에도 `.git` 없음). 이 태스크의 산출물은 파일 내용 자체이며 커밋 대상이 아니다. `animal` 레포에는 이 태스크에서 코드 변경이 없다.
@@ -14836,7 +14836,7 @@ grep -rn "SucceededApiResponseBody<\|PaginatedApiResponseBody<" \
 
 Expected:
 - 함께 찾기 엔드포인트 32개가 출력된다(계약 §8 의 31개 신규 + R9 의 `POST /teams/{teamId}/archive`). 기존 `POST /post` 는 `post` 패키지라 여기 잡히지 않는다 → 문서 총계는 33개.
-- ErrorCode 12개, `NotificationType` 신규 상수 20개(phase 1 발행 16 + 선언만 4)가 모두 출력된다.
+- ErrorCode 11개, `NotificationType` 신규 상수 20개(phase 1 발행 16 + 선언만 4)가 모두 출력된다.
 - 목록 4종(`memberships`, `blocks`, `team-supports`, `teams/{id}/memberships`)의 반환 타입이 `SucceededApiResponseBody<List<...>>` 이고, `GET /teams` 만 `PaginatedApiResponseBody<TeamSummaryResponse>` 다.
 
 **출력과 아래 Step 2~9 의 문서 내용이 다르면 문서를 코드에 맞춘다** — 문서가 아니라 코드가 사실이다. 특히 DTO 필드명은 Step 1 출력값을 그대로 옮긴다.
@@ -15709,7 +15709,7 @@ Expected: `6` — 10~15번 행이 모두 들어갔다(1~9번은 한 자리라 �
 `## 변경 이력` 표 마지막(2026-07-04 행 뒤)에 붙인다.
 
 ```markdown
-| 2026-07-25 | **함께 찾기(FR-17) phase 1 백엔드** — Flyway `V12`(`search_group`/`search_group_member`/`search_group_user_block`/`team`/`team_member`/`search_group_team`/`search_group_event` + `notification` 구조화 컬럼 5개 + SEARCHING 백필). 신규 엔드포인트 32개(Search Group 19 / Team 12 / Search Hub 1) + 기존 `POST /post` 에 `joinPolicy` 파라미터 추가 = 총 33개. ErrorCode 12개 추가 — legacy `NOT_FOUND_*`(400)와 달리 **404/409/410 을 의도적으로 사용**. `NotificationType` 상수 20개 추가(phase 1 발행 16 + 선언만 4, 롤링 배포 중 미지의 enum 500 방지). 재시도·중복 클릭은 409 가 아니라 **멱등 200**(자연키 UNIQUE + 조건부 전이). `HttpMessageNotReadableException`/`MissingRequestHeaderException` 400 `MISSING_PARAMETER` 매핑 추가(기존 500 오매핑). 알림 정렬 tiebreaker `id DESC`. 권한 행렬(6역할×14행위)·IDOR·동시성·개인정보 IT 신설 + CI 백엔드 테스트 job 신설. **프론트엔드 미구현 — 사용자 노출 없음** |
+| 2026-07-25 | **함께 찾기(FR-17) phase 1 백엔드** — Flyway `V12`(`search_group`/`search_group_member`/`search_group_user_block`/`team`/`team_member`/`search_group_team`/`search_group_event` + `notification` 구조화 컬럼 5개 + SEARCHING 백필). 신규 엔드포인트 32개(Search Group 19 / Team 12 / Search Hub 1) + 기존 `POST /post` 에 `joinPolicy` 파라미터 추가 = 총 33개. ErrorCode 11개 추가 — legacy `NOT_FOUND_*`(400)와 달리 **404/409/410 을 의도적으로 사용**. `NotificationType` 상수 20개 추가(phase 1 발행 16 + 선언만 4, 롤링 배포 중 미지의 enum 500 방지). 재시도·중복 클릭은 409 가 아니라 **멱등 200**(자연키 UNIQUE + 조건부 전이). `HttpMessageNotReadableException`/`MissingRequestHeaderException` 400 `MISSING_PARAMETER` 매핑 추가(기존 500 오매핑). 알림 정렬 tiebreaker `id DESC`. 권한 행렬(6역할×14행위)·IDOR·동시성·개인정보 IT 신설 + CI 백엔드 테스트 job 신설. **프론트엔드 미구현 — 사용자 노출 없음** |
 ```
 
 Run(검증): `grep -n "2026-07-25" /Users/park/Desktop/project/prd/find-my-pet/api-spec.md`
