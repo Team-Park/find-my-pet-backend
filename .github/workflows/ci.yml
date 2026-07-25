@@ -45,3 +45,84 @@ jobs:
         run: |
           rm -f ~/.gradle/caches/modules-2/modules-2.lock
           rm -f ~/.gradle/caches/modules-2/gc.properties
+
+  # 설계 19.4 CI 게이트: build job 이 `-x test` 로 테스트를 건너뛰므로 백엔드 테스트를 실제로
+  # 실행하는 별도 job 을 둔다. build job 은 이미지 빌드 경로(cd.yml)와 동일한 형태라 그대로 유지한다.
+  #
+  # Testcontainers 전제:
+  #   SearchFulltextIT / SearchGroupMigrationIT 는 MySQLContainer("mysql:8.4") 를 띄우므로
+  #   Docker daemon 이 반드시 필요하다. GitHub 호스티드 ubuntu-latest 러너 이미지에는 Docker Engine 이
+  #   사전 설치되어 daemon 이 기동돼 있어 별도 services 설정 없이 동작한다.
+  #   이 job 을 self-hosted / macos-latest / windows-latest 로 옮기면 Docker 가 없어 무조건 실패한다.
+  #
+  # 자격증명:
+  #   gradle.properties 는 .gitignore 대상이라 러너에 존재하지 않는다. 따라서 CI 에서는
+  #   -Pgpr.* 플래그로 secrets 를 주입해야 한다. 반대로 로컬에서는 gradle.properties 가 있으므로
+  #   같은 플래그를 붙이면 빈 값이 자격증명을 덮어써 401 이 난다 — 로컬 실행 시 붙이지 말 것.
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-test-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-test-
+            ${{ runner.os }}-gradle-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 테스트 실패와 "Docker 가 없어서 못 돎" 을 로그에서 즉시 구분하기 위한 사전 확인.
+      - name: Verify Docker daemon (Testcontainers precondition)
+        run: |
+          docker version
+          docker info --format 'ServerVersion={{.ServerVersion}}'
+
+      - name: Run backend tests
+        run: ./gradlew test --refresh-dependencies --stacktrace -Pgpr.user=PARKPARKWOO -Pgpr.key=${{ secrets.GIT_PASSWORD }}
+
+      # 게이트: Gradle 이 "성공" 을 리턴해도 테스트가 0건 실행됐거나 skip 됐으면 완료로 인정하지 않는다.
+      # SearchFulltextIT 는 이 레포에서 Docker 를 실제로 쓰는 유일한 기존 IT 이므로 카나리아로 쓴다.
+      - name: Assert integration tests actually executed
+        if: ${{ always() }}
+        run: |
+          XML=build/test-results/test/TEST-com.park.animal.search.SearchFulltextIT.xml
+          if [ ! -f "$XML" ]; then
+            echo "::error::$XML 없음 — Testcontainers IT 가 실행되지 않았다."
+            exit 1
+          fi
+          head -c 400 "$XML"
+          grep -qE 'tests="[1-9][0-9]*"' "$XML" || { echo "::error::실행된 테스트 0건"; exit 1; }
+          grep -q 'failures="0"' "$XML" || { echo "::error::IT 실패"; exit 1; }
+          grep -q 'errors="0"'   "$XML" || { echo "::error::IT 에러"; exit 1; }
+          grep -q 'skipped="0"'  "$XML" || { echo "::error::IT skip 됨 — 게이트 무력화"; exit 1; }
+
+      - name: Upload test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: |
+            build/test-results/test
+            build/reports/tests/test
+          retention-days: 7
+
+      - name: Cleanup Gradle Cache
+        if: ${{ always() }}
+        run: |
+          rm -f ~/.gradle/caches/modules-2/modules-2.lock
+          rm -f ~/.gradle/caches/modules-2/gc.properties
