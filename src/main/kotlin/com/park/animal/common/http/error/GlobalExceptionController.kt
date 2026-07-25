@@ -6,6 +6,8 @@ import jakarta.servlet.http.HttpServletRequest
 import org.springframework.boot.logging.LogLevel
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
+import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -49,7 +51,30 @@ class GlobalExceptionController {
         request: HttpServletRequest,
     ): ResponseEntity<FailedApiResponseBody> = respond(ErrorCode.NOT_FOUND_ROUTE, e, request)
 
-    @ExceptionHandler(MissingServletRequestParameterException::class, MethodArgumentTypeMismatchException::class)
+    /**
+     * 요청 바인딩 실패 4종을 한 곳에서 400 [ErrorCode.MISSING_PARAMETER] 로 내린다.
+     *
+     * - MissingServletRequestParameterException: 필수 query/form 파라미터 누락
+     * - MethodArgumentTypeMismatchException: UUID/enum 등 타입 변환 실패.
+     *   `joinPolicy=WHATEVER` 처럼 enum 에 없는 문자열이 오는 경우가 여기다.
+     * - HttpMessageNotReadableException: 깨진 JSON, 또는 Kotlin non-null 필드 누락으로
+     *   Jackson 이 인스턴스화에 실패한 경우. 핸들러가 없어 500 으로 떨어지고 있었다(F9).
+     *   이 레포에는 spring-boot-starter-validation 이 없어 @Valid 가 무동작이므로,
+     *   본문 형태 오류를 400 으로 만드는 유일한 지점이 여기다.
+     * - MissingRequestHeaderException: 필수 헤더 누락. ServletRequestBindingException 하위라
+     *   MissingServletRequestParameterException 핸들러에 걸리지 않아 역시 500 이었다(F10).
+     *
+     * 경계 규약: 여기서 처리하는 것은 "요청이 컨트롤러 시그니처에 **바인딩되지 못한**" 경우뿐이다.
+     * 바인딩은 됐지만 값이 도메인 규칙을 어긴 경우(팀 이름 길이 등)는 서비스가
+     * [ErrorCode.INVALID_COLLABORATION_INPUT] 을 던진다. 두 코드를 섞지 않는다 —
+     * 프론트가 "형식이 틀림" 과 "값이 규칙 위반" 을 다르게 안내한다.
+     */
+    @ExceptionHandler(
+        MissingServletRequestParameterException::class,
+        MethodArgumentTypeMismatchException::class,
+        HttpMessageNotReadableException::class,
+        MissingRequestHeaderException::class,
+    )
     fun missingParameter(
         e: Exception,
         request: HttpServletRequest,

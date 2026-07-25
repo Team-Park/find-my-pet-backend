@@ -7,7 +7,6 @@ import com.park.animal.notification.entity.Notification
 import com.park.animal.notification.entity.NotificationType
 import com.park.animal.notification.repository.NotificationRepository
 import org.springframework.data.domain.PageRequest
-import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -59,9 +58,12 @@ class NotificationService(
         size: Int,
         offset: Int,
     ): List<NotificationResponse> {
-        val page = PageRequest.of(offset / size.coerceAtLeast(1), size.coerceAtLeast(1), Sort.by(Sort.Direction.DESC, "createdAt"))
+        val pageSize = size.coerceAtLeast(1)
+        // 정렬은 파생 쿼리명(createdAt DESC, id DESC)이 담당한다. Pageable 에 Sort 를 실으면
+        // 같은 ORDER BY 절이 중복 생성된다.
+        val page = PageRequest.of(offset / pageSize, pageSize)
         return notificationRepository
-            .findByUserIdAndDeletedAtIsNullOrderByCreatedAtDesc(userId, page)
+            .findByUserIdAndDeletedAtIsNullOrderByCreatedAtDescIdDesc(userId, page)
             .content
             .map(NotificationResponse::from)
     }
