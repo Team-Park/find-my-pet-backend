@@ -49,6 +49,7 @@ import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.testcontainers.containers.MySQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -369,6 +370,41 @@ class SearchLifecycleIT {
         assertEquals(0L, postRepository.count(), "suspend 함수에 @Transactional 을 붙이면 여기서 post 가 남는다(F2)")
         assertEquals(0L, searchGroupRepository.count())
         assertEquals(0L, searchGroupEventRepository.count())
+    }
+
+    @Test
+    fun `이미지 업로드는 DB 트랜잭션 밖에서 post 저장보다 먼저 끝난다`() {
+        // MinIO 업로드 호출 시점의 상태를 그 자리에서 캡처한다 — 나중에 다시 조회하면 이미
+        // 트랜잭션이 커밋된 뒤라 순서를 증명할 수 없다.
+        var transactionActiveDuringUpload: Boolean? = null
+        var postCountDuringUpload: Long? = null
+        runBlocking {
+            whenever(multimediaService.uploadMultipartFiles(any(), any(), any())).thenAnswer {
+                transactionActiveDuringUpload = TransactionSynchronizationManager.isActualTransactionActive()
+                postCountDuringUpload = postRepository.count()
+                listOf("test-bucket/post/${UUID.randomUUID()}")
+            }
+        }
+
+        runBlocking {
+            postService.registerPost(
+                registerCommand(MissingAnimalStatus.SEARCHING, JoinPolicy.OPEN, withImage = true),
+            )
+        }
+
+        assertEquals(
+            false,
+            transactionActiveDuringUpload,
+            "업로드 호출 시점에 Spring 트랜잭션이 열려 있으면 안 된다 — 열려 있으면 그 트랜잭션이 " +
+                "Hikari 커넥션(풀 크기 20)을 오브젝트 스토리지 왕복 내내 붙잡는다",
+        )
+        assertEquals(
+            0L,
+            postCountDuringUpload,
+            "업로드는 post 저장보다 먼저 끝나야 한다 — 업로드 시점에 이미 post 행이 보이면 " +
+                "PostWriteService 의 트랜잭션이 업로드를 감싸고 있다는 뜻이다",
+        )
+        assertEquals(1L, postRepository.count(), "업로드가 끝난 뒤에는 post 가 정상적으로 생성된다")
     }
 
     // (g) 알림 중복 제거

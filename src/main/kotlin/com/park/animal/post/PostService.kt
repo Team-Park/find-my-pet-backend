@@ -53,11 +53,29 @@ class PostService(
     /**
      * 실종 소식 등록. `@Transactional` 은 여기 붙이지 않는다 — `suspend fun` 에는 트랜잭션이
      * 걸리지 않기 때문이다(F2). DB 단위작업은 [PostWriteService] 가 담당한다.
+     *
+     * **순서가 곧 계약이다: 업로드가 먼저, DB 는 그 다음.** 이미지가 있으면 [uploadImages] 를
+     * 트랜잭션도 커넥션도 없는 상태에서 먼저 끝내고, 그 URL 을 [PostWriteService.createPostWithSearchGroup]
+     * 에 값으로 넘긴다. 이 함수는 이미 `suspend` 컨텍스트이므로 업로드에는 `runBlocking` 이 아니라
+     * 기존 코루틴을 그대로 쓴다 — `runBlocking` 을 쓰면 파일별 `async` 업로드가 이 스레드 하나의
+     * 이벤트 루프를 나눠 써야 한다. 업로드가 실패하면 [ImageUploadException] 이 여기서 곧장 던져져
+     * DB 쓰기 자체가 시작되지 않는다 — post 행이 하나도 남지 않는다
+     * (`SearchLifecycleIT."이미지 업로드가 실패하면 post 도 수색그룹도 남지 않는다"`).
+     *
+     * **받아들인 트레이드오프**: 업로드 성공 직후, [PostWriteService] 의 트랜잭션이 커밋되기 전에
+     * 죽으면 MinIO 에 참조되지 않는 오브젝트가 하나 남는다. 고아 blob 은 고아 post·오래 붙잡힌
+     * Hikari 커넥션보다 훨씬 싸므로 의도적으로 감수한다(사람 결정, 코디네이터 리뷰 이후).
      */
     suspend fun registerPost(command: RegisterPostCommand) {
         validateBreed(command.animalType, command.breedId)
+        val imageUrls =
+            if (command.images.isNotEmpty()) {
+                uploadImages(command.images, command.userId, command.applicationId)
+            } else {
+                emptyList()
+            }
         withContext(Dispatchers.IO) {
-            postWriteService.createPostWithSearchGroup(command, command.joinPolicy)
+            postWriteService.createPostWithSearchGroup(command, command.joinPolicy, imageUrls)
         }
     }
 
