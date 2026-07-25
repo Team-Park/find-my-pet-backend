@@ -12,7 +12,10 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.MissingServletRequestParameterException
+import org.springframework.web.bind.annotation.ExceptionHandler
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.servlet.resource.NoResourceFoundException
+import kotlin.reflect.KClass
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
@@ -91,6 +94,33 @@ class GlobalExceptionMappingTest {
 
         assertEquals(HttpStatus.BAD_REQUEST, res.statusCode)
         assertEquals(ErrorCode.MISSING_PARAMETER.name, res.body!!.code)
+    }
+
+    /**
+     * 위 세 테스트(`잘못된 JSON 본문...`, `필수 헤더 누락...`)는 [GlobalExceptionController.missingParameter]
+     * 를 직접 호출해 반환값만 검증한다. 그 메서드 본문은 무조건
+     * `respond(ErrorCode.MISSING_PARAMETER, ...)` 이므로, 이 태스크가 실제로 바꾼 것 —
+     * `@ExceptionHandler` 목록에 `HttpMessageNotReadableException`/`MissingRequestHeaderException`
+     * 를 추가한 것 — 을 지워도 위 두 테스트는 똑같이 통과한다(F9/F10 프로덕션 수정을 되돌려도 안 잡힘).
+     * 그래서 라우팅 자체를 애노테이션 리플렉션으로 검증한다.
+     */
+    @Test
+    fun `missingParameter 핸들러가 4종 예외 모두에 연결돼 있다`() {
+        val handler =
+            GlobalExceptionController::class.java
+                .getDeclaredMethod("missingParameter", Exception::class.java, HttpServletRequest::class.java)
+                .getAnnotation(ExceptionHandler::class.java)
+
+        val wired: Set<KClass<out Throwable>> = handler.value.toSet()
+        val expected: Set<KClass<out Throwable>> =
+            setOf(
+                MissingServletRequestParameterException::class,
+                MethodArgumentTypeMismatchException::class,
+                HttpMessageNotReadableException::class,
+                MissingRequestHeaderException::class,
+            )
+
+        assertEquals(expected, wired)
     }
 
     @Test
