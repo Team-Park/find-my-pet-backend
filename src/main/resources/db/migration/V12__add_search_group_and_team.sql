@@ -2,6 +2,14 @@
 -- 신규 테이블 타임스탬프는 DATETIME(6): post(DATETIME(6))와 조인 정합 + TIMESTAMP 의 세션 timezone
 -- 변환/초 정밀도 문제 회피. BaseEntity 매핑상 deleted_at 은 모든 테이블에 필수(V10 사고 재발 방지).
 -- 멤버십/연결 테이블은 deleted_at 을 사용하지 않는다 — 생명주기는 status 전이로만 표현한다.
+--
+-- 이 파일은 CREATE TABLE 7개만 담는다. notification 컬럼 확장은 V13, 백필은 V14 로 분리했다:
+-- MySQL 은 DDL 이 트랜잭션이 아니고 각 문장이 즉시 커밋되며, FlywayConfig 는 부팅마다
+-- repair() 후 migrate() 를 돈다. 대용량 post 를 풀스캔하는 백필이 이 파일 안에 있었다면
+-- 타임아웃 시 repair() 가 파일 전체를 재실행하다 이미 존재하는 CREATE TABLE search_group 에서
+-- 죽고, 그 뒤로는 어떤 배포도 성공하지 못한다. fk_search_group_post 는 의도적으로 이 파일의
+-- 첫 CREATE TABLE 안에 둔다 — post.id 와 collation 이 다르면 가능한 가장 이른 시점(첫 테이블
+-- 생성)에 실패를 터뜨리기 위해서다.
 
 CREATE TABLE search_group
 (
@@ -125,24 +133,3 @@ CREATE TABLE search_group_event
     deleted_at   DATETIME(6)      DEFAULT NULL,
     KEY idx_sge_group_created (group_id, created_at, id)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
-
--- 알림 구조화 컨텍스트 (설계 9). 기존 행은 전부 NULL 로 남아 하위 호환.
--- user_id 컬럼명은 유지한다 (파생 쿼리 4개 + markAllRead JPQL + V7 인덱스가 참조).
-ALTER TABLE notification
-    ADD COLUMN actor_user_id VARCHAR(36) DEFAULT NULL,
-    ADD COLUMN actor_name    VARCHAR(64) DEFAULT NULL,
-    ADD COLUMN post_id       VARCHAR(36) DEFAULT NULL,
-    ADD COLUMN group_id      VARCHAR(36) DEFAULT NULL,
-    ADD COLUMN team_id       VARCHAR(36) DEFAULT NULL;
-
-CREATE INDEX idx_noti_user_group ON notification (user_id, group_id, created_at);
-
--- 백필: 기능 도입 시점의 삭제되지 않은 SEARCHING 실종 소식마다 OPEN·ACTIVE 그룹 1개 (설계 17 말미).
--- SEEN / FOUND / soft-delete 는 대상 아님. NOT EXISTS 가드로 개별 재실행 가능.
--- MySQL UUID() 는 v1 이라 시간순 정렬이 되지 않는다 → search_group 을 id 로 정렬/페이징하지 말 것.
-INSERT INTO search_group (id, post_id, join_policy, status, created_at, updated_at)
-SELECT UUID(), p.id, 'OPEN', 'ACTIVE', NOW(6), NOW(6)
-  FROM post p
- WHERE p.missing_animal_status = 'SEARCHING'
-   AND p.deleted_at IS NULL
-   AND NOT EXISTS (SELECT 1 FROM search_group g WHERE g.post_id = p.id);

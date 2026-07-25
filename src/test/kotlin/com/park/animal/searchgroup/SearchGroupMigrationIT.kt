@@ -2,11 +2,19 @@ package com.park.animal.searchgroup
 
 import com.park.animal.common.config.JpaConfig
 import com.park.animal.searchgroup.entity.JoinPolicy
+import com.park.animal.searchgroup.entity.SearchGroupEvent
+import com.park.animal.searchgroup.entity.SearchGroupEventType
 import com.park.animal.searchgroup.entity.SearchGroupMember
 import com.park.animal.searchgroup.entity.SearchGroupMemberStatus
 import com.park.animal.searchgroup.entity.SearchGroupStatus
+import com.park.animal.searchgroup.entity.SearchGroupTeam
+import com.park.animal.searchgroup.entity.SearchGroupTeamStatus
+import com.park.animal.searchgroup.entity.SearchGroupUserBlock
+import com.park.animal.searchgroup.repository.SearchGroupEventRepository
 import com.park.animal.searchgroup.repository.SearchGroupMemberRepository
 import com.park.animal.searchgroup.repository.SearchGroupRepository
+import com.park.animal.searchgroup.repository.SearchGroupTeamRepository
+import com.park.animal.searchgroup.repository.SearchGroupUserBlockRepository
 import com.park.animal.team.entity.Team
 import com.park.animal.team.entity.TeamMember
 import com.park.animal.team.entity.TeamMemberStatus
@@ -24,6 +32,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest
 import org.springframework.context.annotation.Import
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.PageRequest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.datasource.DriverManagerDataSource
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -43,13 +52,19 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * V12(함께 찾기 스키마) 마이그레이션 검증 — 운영과 동일한 mysql:8.4 + Flyway 전체 체인.
+ * V12~V14(함께 찾기 스키마) 마이그레이션 검증 — 운영과 동일한 mysql:8.4 + Flyway 전체 체인.
  *
- * 백필은 "V12 실행 시점의 post 스냅샷" 을 대상으로 하므로, 컨테이너에 V1~V11 만 먼저 적용하고
- * post 를 심은 뒤 V12 를 돌려야 검증이 성립한다. @DynamicPropertySource 는 컨테이너 기동 후,
+ * V12(테이블 7개 생성) / V13(notification 컬럼 확장) / V14(백필)로 분리되어 있다 — 대용량
+ * post 풀스캔인 백필이 실패해도 이미 커밋된 CREATE TABLE 들을 다시 밟지 않고 V14 만 재시도
+ * 하도록 하기 위해서다(MySQL DDL 은 트랜잭션이 아니고, FlywayConfig 는 부팅마다 repair() 후
+ * migrate() 를 돈다). 이 테스트는 그 파일 수에 의존하지 않고 최종 스키마 상태(테이블/컬럼/백필
+ * 결과)만 검증한다.
+ *
+ * 백필은 "V14 실행 시점의 post 스냅샷" 을 대상으로 하므로, 컨테이너에 V1~V11 만 먼저 적용하고
+ * post 를 심은 뒤 V12~V14 를 돌려야 검증이 성립한다. @DynamicPropertySource 는 컨테이너 기동 후,
  * ApplicationContext 생성 전에 정확히 한 번 실행되므로 그 안에서 V11 스테이징과 시딩을 끝낸다.
- * V12 는 일부러 적용하지 않고 애플리케이션 자신의 Flyway 오토컨피그가 올리게 둔다 —
- * 운영과 같은 경로로 검증되고, V12 가 깨지면 컨텍스트 로딩 실패로 즉시 드러난다.
+ * V12~V14 는 일부러 적용하지 않고 애플리케이션 자신의 Flyway 오토컨피그가 올리게 둔다 —
+ * 운영과 같은 경로로 검증되고, 셋 중 하나라도 깨지면 컨텍스트 로딩 실패로 즉시 드러난다.
  *
  * 트랜잭션 래핑을 끄는 이유(NOT_SUPPORTED, SearchFulltextIT 와 동일):
  * UNIQUE 제약 위반과 조건부 UPDATE 의 영향 행 수는 실제 커밋 경계에서만 관측 가능하다.
@@ -66,6 +81,12 @@ class SearchGroupMigrationIT {
     @Autowired lateinit var searchGroupRepository: SearchGroupRepository
 
     @Autowired lateinit var searchGroupMemberRepository: SearchGroupMemberRepository
+
+    @Autowired lateinit var searchGroupUserBlockRepository: SearchGroupUserBlockRepository
+
+    @Autowired lateinit var searchGroupTeamRepository: SearchGroupTeamRepository
+
+    @Autowired lateinit var searchGroupEventRepository: SearchGroupEventRepository
 
     @Autowired lateinit var teamRepository: TeamRepository
 
@@ -87,12 +108,13 @@ class SearchGroupMigrationIT {
 
     @Test
     @Order(1)
-    fun `V1부터 V12까지 전체 체인이 깨끗한 컨테이너에서 통과한다`() {
+    fun `V1부터 V14까지 전체 체인이 깨끗한 컨테이너에서 통과한다`() {
         assertEquals(0L, count("SELECT COUNT(*) FROM flyway_schema_history WHERE success = 0"), "실패한 마이그레이션이 남아 있다")
+        // 파일이 몇 개로 쪼개졌는지는 신경 쓰지 않는다 — 체인이 끝(V14)까지 성공했는지만 본다.
         assertEquals(
             1L,
-            count("SELECT COUNT(*) FROM flyway_schema_history WHERE version = '12' AND success = 1"),
-            "V12 가 적용되지 않았다",
+            count("SELECT COUNT(*) FROM flyway_schema_history WHERE version = '14' AND success = 1"),
+            "V12~V14(수색그룹 스키마 전체 체인)가 끝까지 적용되지 않았다",
         )
 
         assertEquals(
@@ -349,6 +371,96 @@ class SearchGroupMigrationIT {
         assertNull(searchGroupMemberRepository.findByIdAndGroupId(membershipId, otherGroup.id))
     }
 
+    @Test
+    @Order(6)
+    fun `SearchGroupUserBlock 라운드트립 — 저장한 컬럼이 그대로 조회된다`() {
+        val group = searchGroupRepository.findByPostIdAndDeletedAtIsNull(UUID.fromString(POST_SEARCHING_A))!!
+        val userId = UUID.randomUUID()
+        val blockedBy = UUID.randomUUID()
+
+        val saved =
+            searchGroupUserBlockRepository.save(
+                SearchGroupUserBlock(
+                    groupId = group.id,
+                    userId = userId,
+                    blockedBy = blockedBy,
+                    reason = "테스트 차단 사유",
+                    blockedAt = LocalDateTime.now(),
+                ),
+            )
+
+        val reloaded = searchGroupUserBlockRepository.findByGroupIdAndUserId(group.id, userId)
+        assertNotNull(reloaded, "저장한 차단을 groupId+userId 로 다시 읽을 수 있어야 한다")
+        assertEquals(saved.id, reloaded.id)
+        assertEquals(group.id, reloaded.groupId)
+        assertEquals(userId, reloaded.userId)
+        assertEquals(blockedBy, reloaded.blockedBy)
+        assertEquals("테스트 차단 사유", reloaded.reason)
+        assertNotNull(reloaded.blockedAt)
+        assertNull(reloaded.unblockedAt, "차단 활성 상태는 unblockedAt 이 NULL 이어야 한다")
+        assertNull(reloaded.deletedAt, "차단·연결 테이블은 deleted_at 을 쓰지 않는다")
+    }
+
+    @Test
+    @Order(7)
+    fun `SearchGroupTeam 라운드트립 — 저장한 컬럼이 그대로 조회된다`() {
+        val group = searchGroupRepository.findByPostIdAndDeletedAtIsNull(UUID.fromString(POST_SEARCHING_A))!!
+        val team = teamRepository.save(Team(name = "라운드트립 팀", description = "IT 검증용", createdBy = UUID.randomUUID()))
+        val requestedBy = UUID.randomUUID()
+
+        val saved =
+            searchGroupTeamRepository.save(
+                SearchGroupTeam(
+                    groupId = group.id,
+                    teamId = team.id,
+                    status = SearchGroupTeamStatus.PENDING_GROUP_APPROVAL,
+                    requestedBy = requestedBy,
+                ),
+            )
+
+        val reloaded = searchGroupTeamRepository.findByGroupIdAndTeamId(group.id, team.id)
+        assertNotNull(reloaded, "저장한 지원 연결을 groupId+teamId 로 다시 읽을 수 있어야 한다")
+        assertEquals(saved.id, reloaded.id)
+        assertEquals(group.id, reloaded.groupId)
+        assertEquals(team.id, reloaded.teamId)
+        assertEquals(SearchGroupTeamStatus.PENDING_GROUP_APPROVAL, reloaded.status)
+        assertEquals(requestedBy, reloaded.requestedBy)
+        assertNotNull(reloaded.requestedAt)
+        assertNull(reloaded.decidedBy)
+        assertNull(reloaded.decidedAt)
+        assertNull(reloaded.activatedAt)
+        assertNull(reloaded.deletedAt, "차단·연결 테이블은 deleted_at 을 쓰지 않는다")
+    }
+
+    @Test
+    @Order(8)
+    fun `SearchGroupEvent 라운드트립 — 저장한 컬럼이 그대로 조회된다`() {
+        val group = searchGroupRepository.findByPostIdAndDeletedAtIsNull(UUID.fromString(POST_SEARCHING_A))!!
+        val actorId = UUID.randomUUID()
+        val targetId = UUID.randomUUID()
+
+        val saved =
+            searchGroupEventRepository.save(
+                SearchGroupEvent(
+                    groupId = group.id,
+                    type = SearchGroupEventType.MEMBER_JOINED,
+                    actorId = actorId,
+                    targetId = targetId,
+                    detail = "테스트 이벤트 상세",
+                ),
+            )
+
+        val page = searchGroupEventRepository.findAllByGroupIdOrderByCreatedAtDescIdDesc(group.id, PageRequest.of(0, 10))
+        val reloaded = page.content.find { it.id == saved.id }
+        assertNotNull(reloaded, "저장한 이벤트가 groupId 목록 조회에 나타나야 한다")
+        assertEquals(group.id, reloaded.groupId)
+        assertEquals(SearchGroupEventType.MEMBER_JOINED, reloaded.type)
+        assertEquals(actorId, reloaded.actorId)
+        assertEquals(targetId, reloaded.targetId)
+        assertEquals("테스트 이벤트 상세", reloaded.detail)
+        assertNull(reloaded.deletedAt, "감사 이벤트는 deleted_at 을 쓰지 않는다(삭제하지 않음)")
+    }
+
     companion object {
         private const val POST_SEARCHING_A = "aaaaaaaa-0000-4000-8000-000000000001"
         private const val POST_SEARCHING_B = "aaaaaaaa-0000-4000-8000-000000000002"
@@ -384,7 +496,7 @@ class SearchGroupMigrationIT {
         }
 
         /**
-         * V1~V11 만 적용하고 백필 대상/비대상 post 를 심는다. V12 는 애플리케이션 Flyway 가 올린다.
+         * V1~V11 만 적용하고 백필 대상/비대상 post 를 심는다. V12~V14 는 애플리케이션 Flyway 가 올린다.
          * @DynamicPropertySource 는 컨테이너 기동 후 · DataSource 생성 전에 호출되므로 여기가 유일한 자리다.
          */
         private fun stageUpToV11AndSeedPosts() {
