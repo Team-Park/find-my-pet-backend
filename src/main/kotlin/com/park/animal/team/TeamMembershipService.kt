@@ -102,13 +102,24 @@ class TeamMembershipService(
                 // 재신청 도중 다른 트랜잭션이 이미 PENDING 으로 되돌렸거나(동시 재신청), 한 걸음 더
                 // 나가 곧바로 ACTIVE 로 승인까지 마쳤을 수 있다(재신청 직후 팀장이 즉시 승인). 둘 다
                 // "다시 팀에 들어가려는" 이 요청의 의도가 이미 달성된 상태이므로 멱등 성공이다.
+                //
+                // 목표별 decidedBy: PENDING 목표는 재신청이 결정이 아니므로 항상 null 이 정합이다
+                // (실제 승자의 재신청 UPDATE 도 null 을 쓴다). ACTIVE 목표는 이 자리에서 진짜 승인자
+                // id 를 알 방법이 없다(비관적 락 없이는 REPEATABLE READ 스냅샷 때문에 최신 커밋을
+                // 읽을 수 없다 — F23). null 을 넘기면 실제 승인자의 decidedBy 를 지워버리므로
+                // (코디네이터 지적 — finding 3), 최소한 "값을 지우지 않는다" 는 성질을 지키기 위해
+                // 이 행이 재신청 전에 갖고 있던 decidedBy(직전 거절/탈퇴/제외 처리자)를 그대로
+                // 흘려보낸다 — 이 좁은 이중 경합(재신청+즉시승인)에서 정확한 승인자를 복원하진
+                // 못하지만, 무조건 null 로 지우는 것보다는 낫다.
                 val current =
                     reloadOrConflict(
                         teamId,
                         existing.id,
-                        listOf(TeamMemberStatus.PENDING, TeamMemberStatus.ACTIVE),
+                        listOf(
+                            TeamMemberStatus.PENDING to null,
+                            TeamMemberStatus.ACTIVE to existing.decidedBy,
+                        ),
                         moved,
-                        null,
                     )
                 if (moved == 0) return TeamMembershipResponse.from(current)
 
@@ -132,7 +143,7 @@ class TeamMembershipService(
         membershipId: UUID,
         leaderUserId: UUID,
     ): TeamMembershipResponse {
-        val team = requireActiveTeam(teamId)
+        requireActiveTeam(teamId)
         requireActiveLeader(teamId, leaderUserId)
         // 설계 §16.1 — 다른 팀의 membershipId 는 tuple 조회에서 걸러져 404 가 된다.
         val target =
@@ -143,11 +154,15 @@ class TeamMembershipService(
         // 인자 순서: (membershipId, teamId, expected, decidedBy, occurredAt).
         // 실제 첫 활성화만 activate() 를 쓴다 — joinedAt 을 여기서 딱 한 번 찍기 위해서다.
         val moved = teamMemberRepository.activate(target.id, teamId, TeamMemberStatus.PENDING, leaderUserId, now)
-        val current = reloadOrConflict(teamId, target.id, listOf(TeamMemberStatus.ACTIVE), moved, leaderUserId)
+        val current = reloadOrConflict(teamId, target.id, listOf(TeamMemberStatus.ACTIVE to leaderUserId), moved)
 
         // affected == 0 이면 이 호출은 confirm(다른 트랜잭션이 이미 ACTIVE 로 만든 것을 뒤늦게
         // 확인)일 뿐 실제 전이를 수행한 게 아니다 — 실제로 전이시킨 쪽만 알림을 남긴다.
         if (moved != 0) {
+            // body 는 항상 null — Task 5 의 템플릿이 문구를 채운다. team.name 을 그대로
+            // 보간하면 사용자가 지은 팀 이름(전화번호·좌표 등)이 다른 사용자의 알림 행에 그대로
+            // 새어나갈 수 있어 설계 §9/§16.5 를 위반한다(브리프 원안의 실수 — 코디네이터 지적,
+            // finding 2. 되돌리지 말 것).
             notificationPublisher.notifyUser(
                 userId = current.userId,
                 type = NotificationType.TEAM_MEMBER_APPROVED,
@@ -155,7 +170,7 @@ class TeamMembershipService(
                 postId = null,
                 groupId = null,
                 teamId = teamId,
-                body = "'${team.name}' 팀의 팀원이 되었어요.",
+                body = null,
             )
         }
         return TeamMembershipResponse.from(current)
@@ -167,7 +182,7 @@ class TeamMembershipService(
         membershipId: UUID,
         leaderUserId: UUID,
     ): TeamMembershipResponse {
-        val team = requireActiveTeam(teamId)
+        requireActiveTeam(teamId)
         requireActiveLeader(teamId, leaderUserId)
         val target =
             teamMemberRepository.findByIdAndTeamId(membershipId, teamId)
@@ -183,9 +198,10 @@ class TeamMembershipService(
                 leaderUserId,
                 now,
             )
-        val current = reloadOrConflict(teamId, target.id, listOf(TeamMemberStatus.REJECTED), moved, leaderUserId)
+        val current = reloadOrConflict(teamId, target.id, listOf(TeamMemberStatus.REJECTED to leaderUserId), moved)
 
         if (moved != 0) {
+            // body = null — Task 5 템플릿이 채운다(finding 2, team.name 보간 금지).
             notificationPublisher.notifyUser(
                 userId = current.userId,
                 type = NotificationType.TEAM_MEMBER_REJECTED,
@@ -193,7 +209,7 @@ class TeamMembershipService(
                 postId = null,
                 groupId = null,
                 teamId = teamId,
-                body = "'${team.name}' 팀의 참여 요청이 받아들여지지 않았어요.",
+                body = null,
             )
         }
         return TeamMembershipResponse.from(current)
@@ -205,7 +221,7 @@ class TeamMembershipService(
         membershipId: UUID,
         leaderUserId: UUID,
     ): TeamMembershipResponse {
-        val team = requireActiveTeam(teamId)
+        requireActiveTeam(teamId)
         val leader = requireActiveLeader(teamId, leaderUserId)
         val target =
             teamMemberRepository.findByIdAndTeamId(membershipId, teamId)
@@ -214,6 +230,17 @@ class TeamMembershipService(
         if (target.id == leader.id) throw BusinessException(ErrorCode.TEAM_LEADER_CANNOT_LEAVE)
 
         val now = LocalDateTime.now()
+        // 강등을 무조건 먼저, status 전이보다 앞서 시도한다 — target 이 실제로 LEADER 인지를
+        // 여기서 읽은(스테일할 수 있는) 값으로 분기하지 않는다(코디네이터 지적 — finding 1).
+        // `target` 은 이 메서드 시작부에서 한 번 읽었을 뿐이므로, 동시에 이 행을 승격시키는
+        // `transferLeadership()` 이 있다면 그 사실이 여기 반영돼 있다는 보장이 없다. changeRole
+        // 자체가 조건부 UPDATE(현재 커밋 데이터 기준 재평가)라 LEADER 가 아닌 행에는 안전한 no-op
+        // 이고, 먼저 실행해 행 잠금을 선점하므로 동시에 이 행을 승격하려는 transferLeadership() 은
+        // 이 트랜잭션이 끝날 때까지 대기했다가 커밋된 REMOVED 상태를 기준으로 재평가돼 0 행으로
+        // 실패한다(409) — 그 반대로 이 메서드가 늦게 실행되면 이미 LEADER 로 승격된 행을 여기서
+        // 강등한 뒤 내보내므로, 어느 순서로 실행되든 REMOVED 행에 LEADER 가 남는 경우가 없다.
+        teamMemberRepository.changeRole(target.id, teamId, TeamRole.LEADER, TeamRole.MEMBER, now)
+
         val moved =
             teamMemberRepository.transition(
                 target.id,
@@ -223,10 +250,11 @@ class TeamMembershipService(
                 leaderUserId,
                 now,
             )
-        val current = reloadOrConflict(teamId, target.id, listOf(TeamMemberStatus.REMOVED), moved, leaderUserId)
+        val current = reloadOrConflict(teamId, target.id, listOf(TeamMemberStatus.REMOVED to leaderUserId), moved)
 
         if (moved != 0) {
             // 행위자·사유를 대상자에게 알리지 않는다 (설계 §6.3).
+            // body = null — Task 5 템플릿이 채운다(finding 2, team.name 보간 금지).
             notificationPublisher.notifyUser(
                 userId = current.userId,
                 type = NotificationType.TEAM_MEMBER_REMOVED,
@@ -234,7 +262,7 @@ class TeamMembershipService(
                 postId = null,
                 groupId = null,
                 teamId = teamId,
-                body = "'${team.name}' 팀에서 나오게 되었어요.",
+                body = null,
             )
         }
         return TeamMembershipResponse.from(current)
@@ -268,14 +296,19 @@ class TeamMembershipService(
         val now = LocalDateTime.now()
         val membershipId = me.id
         val expected = me.status
-        if (isActiveLeader) {
-            // 보관된 팀의 마지막 팀장. LEFT 행에 LEADER 가 남지 않도록 먼저 강등한다.
-            teamMemberRepository.changeRole(membershipId, teamId, TeamRole.LEADER, TeamRole.MEMBER, now)
-        }
+        // 강등을 무조건 먼저, status 전이보다 앞서 시도한다 — `isActiveLeader` 로 분기하지 않는다
+        // (코디네이터 지적 — finding 1). `isActiveLeader` 는 이 메서드 시작부의 한 번뿐인 읽기라,
+        // 동시에 이 행을 승격시키는 `transferLeadership()` 이 있다면 그 사실이 반영돼 있다는 보장이
+        // 없다 — 그 경우 `isActiveLeader == false` 로 읽었어도 changeRole 이 무조건 실행되므로
+        // (조건부 UPDATE 라 LEADER 가 아닌 행에는 안전한 no-op) LEFT 행에 LEADER 가 남지 않는다.
+        // 먼저 실행해 행 잠금을 선점하므로 동시에 이 행을 승격하려는 transferLeadership() 은 이
+        // 트랜잭션이 끝날 때까지 대기했다가 커밋된 LEFT 상태를 기준으로 재평가돼 0 행으로
+        // 실패한다(409).
+        teamMemberRepository.changeRole(membershipId, teamId, TeamRole.LEADER, TeamRole.MEMBER, now)
 
         val moved =
             teamMemberRepository.transition(membershipId, teamId, expected, TeamMemberStatus.LEFT, userId, now)
-        val current = reloadOrConflict(teamId, membershipId, listOf(TeamMemberStatus.LEFT), moved, userId)
+        val current = reloadOrConflict(teamId, membershipId, listOf(TeamMemberStatus.LEFT to userId), moved)
         return TeamMembershipResponse.from(current)
     }
 
@@ -315,6 +348,7 @@ class TeamMembershipService(
                 TeamRole.LEADER,
                 TeamMemberStatus.ACTIVE,
             ) ?: return
+        // body = null — Task 5 템플릿이 채운다(finding 2, team.name 보간 금지).
         notificationPublisher.notifyUser(
             userId = leader.userId,
             type = NotificationType.TEAM_MEMBER_REQUESTED,
@@ -322,7 +356,7 @@ class TeamMembershipService(
             postId = null,
             groupId = null,
             teamId = team.id,
-            body = "'${team.name}' 팀에 새 참여 요청이 도착했어요.",
+            body = null,
         )
     }
 
@@ -330,6 +364,12 @@ class TeamMembershipService(
      * 영향 행 0 이면(경합에서 진 경우) [acceptableTargets] 각각에 대해 target → target 같은 값
      * 조건부 UPDATE 로 재확인한다. 하나라도 매칭되면(1행) 그 목표에 이미 도달한 것이라 멱등 성공,
      * 전부 매칭되지 않으면(모두 0행) 진짜 충돌(409)이다.
+     *
+     * 목표마다 확인용 UPDATE 에 쓸 `decidedBy` 값을 **쌍으로** 받는다(단일 값이 아니다) — 목표에
+     * 따라 "이미 그 상태라면 어떤 decidedBy 여야 정합한가" 가 다르기 때문이다. 예를 들어
+     * [request] 의 재신청 확인은 PENDING 목표에는 `null`(재신청은 결정이 아니다), ACTIVE 목표에는
+     * 실제 결정자 흔적을 남기려는 값을 각각 다르게 넘긴다 — 하나의 값을 두 목표에 공용으로 쓰면
+     * 한쪽이 반드시 틀린다(코디네이터 지적 — finding 3).
      *
      * 영향 행이 있으면(이 트랜잭션이 실제로 전이시킨 경우) 그 결과를 그대로 재조회해 반환한다 —
      * 자신이 방금 쓴 값은 REPEATABLE READ 스냅샷과 무관하게 항상 보인다(read-your-own-writes).
@@ -346,14 +386,13 @@ class TeamMembershipService(
     private fun reloadOrConflict(
         teamId: UUID,
         membershipId: UUID,
-        acceptableTargets: List<TeamMemberStatus>,
+        acceptableTargets: List<Pair<TeamMemberStatus, UUID?>>,
         affected: Int,
-        decidedBy: UUID?,
     ): TeamMember {
         if (affected == 0) {
             val now = LocalDateTime.now()
             val confirmed =
-                acceptableTargets.any { target ->
+                acceptableTargets.any { (target, decidedBy) ->
                     teamMemberRepository.transition(membershipId, teamId, target, target, decidedBy, now) != 0
                 }
             if (!confirmed) throw BusinessException(ErrorCode.SEARCH_GROUP_STATE_CONFLICT)

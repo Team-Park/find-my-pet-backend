@@ -434,6 +434,131 @@ class TeamMembershipIT {
         )
     }
 
+    /**
+     * 팀장 이전(승격)과 내보내기 경합 (코디네이터 지적 — finding 1).
+     *
+     * `TeamMemberRepository.transition()`/`changeRole()` 의 WHERE 절은 `id`/`team_id`/`status`(또는
+     * `role`)만 본다 — `remove()`/`leaveMe()` 가 "강등이 필요한지" 를 이 메서드 시작부의 (스테일할 수
+     * 있는) 읽기로 분기하면, 동시에 그 행을 승격시키는 `transferLeadership()` 이 있을 때 REMOVED/LEFT
+     * 행에 `role = LEADER` 가 그대로 남을 수 있다. 그러면 팀에 활성 팀장이 하나도 없어지고,
+     * `archive()` 를 포함한 모든 팀장 전용 API 가 `requireActiveLeader` 에서 막혀 복구 경로가 없다.
+     *
+     * 승자는 원시 리포지토리로 `changeRole(강등) → changeRole(승격)` 을 직접 호출해(`transferLeadership()`
+     * 의 실제 두 단계와 같은 순서) 커밋 시점을 정확히 통제하고, 패자는 실제 `teamMembershipService.
+     * remove(...)` 를 부른다. 패자의 (finding 1 로 추가된) 무조건 강등 시도는 승자가 아직 커밋하지
+     * 않은 동안 그 행의 잠금 대기열에 들어가고, 승자가 커밋해 그 행이 `LEADER`+`ACTIVE` 가 된 뒤에야
+     * 재개된다 — current-read 로 최신 커밋 데이터를 확인하므로 이때는 실제로 강등(1행)이 일어난다.
+     *
+     * **이 경합이 증명하지 않는 것(정직하게 밝힌다)**: 이 특정 인터리빙(팀장 이전이 먼저 전부
+     * 커밋된 뒤 내보내기가 재개)에서는 팀 전체가 일시적으로 무팀장 상태가 된다 — 이전 팀장은
+     * 정당하게 강등됐고(팀장 이전 자체는 성공), 새로 승격된 팀원은 (스테일 읽기로 인해 이 경합을
+     * 모른 채) 곧바로 내보내지기 때문이다. 이 fix 가 보장하는 것은 정확히 하나 — **어떤 REMOVED/LEFT
+     * 행도 role = LEADER 를 남기지 않는다** — 이지 "이 경합에서 팀장이 반드시 살아남는다" 가 아니다
+     * (그건 팀 전체 멤버십에 대한 비관적 락이나 SERIALIZABLE 격리가 있어야 가능한데 계약 F23 이
+     * 비관적 락을 금지한다). "내보내기가 팀장 이전보다 먼저 커밋되는" 반대 인터리빙에서 팀장 이전이
+     * 안전하게 409 로 실패해 팀장이 그대로 남는 경우는 별도 테스트(순차 시나리오)로 고정한다.
+     */
+    @Test
+    fun `팀장 이전이 팀원을 승격하는 도중 그 팀원을 내보내면 내보내진 행은 role을 LEADER로 남기지 않는다`() {
+        val leaderId = UUID.randomUUID()
+        val memberId = UUID.randomUUID()
+        val team = teamService.create(leaderId, "팀장", "경합 수색대", null)
+        val requested = teamMembershipService.request(team.id, memberId, "팀원")
+        val member = teamMembershipService.approve(team.id, requested.id, leaderId)
+        val leaderMembershipId =
+            teamMemberRepository.findByTeamIdAndUserId(team.id, leaderId)!!.id
+
+        val winnerPromoteDone = CountDownLatch(1)
+        val loserError = AtomicReference<Throwable?>()
+
+        val winnerThread =
+            Thread {
+                TransactionTemplate(transactionManager).execute {
+                    // transferLeadership() 과 같은 순서: 강등 먼저, 승격 다음.
+                    teamMemberRepository.changeRole(
+                        leaderMembershipId,
+                        team.id,
+                        TeamRole.LEADER,
+                        TeamRole.MEMBER,
+                        LocalDateTime.now(),
+                    )
+                    teamMemberRepository.changeRole(
+                        member.id,
+                        team.id,
+                        TeamRole.MEMBER,
+                        TeamRole.LEADER,
+                        LocalDateTime.now(),
+                    )
+                    winnerPromoteDone.countDown()
+                    // 패자가 같은 행에 changeRole(강등) 을 시도해 잠금 대기열에 들어갈 시간을 번다.
+                    Thread.sleep(300)
+                }
+            }
+
+        val loserThread =
+            Thread {
+                try {
+                    winnerPromoteDone.await(2, TimeUnit.SECONDS)
+                    teamMembershipService.remove(team.id, member.id, leaderId)
+                } catch (e: Throwable) {
+                    loserError.set(e)
+                }
+            }
+
+        winnerThread.start()
+        loserThread.start()
+        winnerThread.join(5_000)
+        loserThread.join(5_000)
+
+        assertNull(loserError.get(), "승격된 행이라도 내보내기 자체는 성공해야 한다: ${loserError.get()}")
+
+        val removedRow = teamMemberRepository.findByIdAndTeamId(member.id, team.id)!!
+        assertEquals(TeamMemberStatus.REMOVED, removedRow.status)
+        assertEquals(TeamRole.MEMBER, removedRow.role, "REMOVED 행은 role 을 LEADER 로 남기지 않는다 — finding 1 의 핵심 단언")
+
+        val anyTerminalRowCarriesLeader =
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM team_member WHERE team_id = ? AND role = 'LEADER' AND status IN ('REMOVED', 'LEFT', 'REJECTED')",
+                Int::class.java,
+                team.id.toString(),
+            )
+        assertEquals(0, anyTerminalRowCarriesLeader, "어떤 종료 상태 행도 role = LEADER 를 남기면 안 된다")
+    }
+
+    /**
+     * 팀장 이전 대상이 이미 내보내진 뒤라면 팀장 이전은 안전하게 실패하고 팀장은 그대로 남는다
+     * (코디네이터 지적 — finding 1, "패자가 아니라 승자가 되는" 반대 인터리빙).
+     *
+     * 위 경합 테스트와 달리 순차 실행만으로 재현된다 — `remove()` 가 완전히 커밋된 뒤에
+     * `transferLeadership()` 이 그 membershipId 를 조회하면 이미 `status = REMOVED` 이므로 사전
+     * 검증에서 바로 409 로 끝난다(강등 UPDATE 조차 시도하지 않는다). 이 경우 팀은 활성 팀장을
+     * 정확히 하나 유지한다 — 팀장 이전이 실패해도 원래 팀장이 그대로 남기 때문이다.
+     */
+    @Test
+    fun `내보내진 팀원을 팀장으로 이전하려 하면 409 이고 팀은 활성 팀장을 정확히 하나 유지한다`() {
+        val leaderId = UUID.randomUUID()
+        val memberId = UUID.randomUUID()
+        val team = teamService.create(leaderId, "팀장", "이전 대상 사전 제거 수색대", null)
+        val requested = teamMembershipService.request(team.id, memberId, "팀원")
+        val member = teamMembershipService.approve(team.id, requested.id, leaderId)
+
+        teamMembershipService.remove(team.id, member.id, leaderId)
+
+        val e =
+            assertFailsWith<BusinessException> {
+                teamService.transferLeadership(team.id, leaderId, member.id)
+            }
+        assertEquals(ErrorCode.SEARCH_GROUP_STATE_CONFLICT, e.errorCode)
+
+        val activeLeaders =
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM team_member WHERE team_id = ? AND role = 'LEADER' AND status = 'ACTIVE'",
+                Int::class.java,
+                team.id.toString(),
+            )
+        assertEquals(1, activeLeaders, "팀장 이전이 실패해도 팀은 활성 팀장을 정확히 하나 유지해야 한다")
+    }
+
     private fun notificationCount(
         userId: UUID,
         type: String,

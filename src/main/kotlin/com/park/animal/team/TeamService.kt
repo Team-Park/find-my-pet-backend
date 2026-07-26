@@ -190,7 +190,7 @@ class TeamService(
         currentLeaderUserId: UUID,
         targetMembershipId: UUID,
     ): TeamResponse {
-        val team = requireActiveTeam(teamId)
+        requireActiveTeam(teamId)
         val leader = requireActiveLeader(teamId, currentLeaderUserId)
         val target =
             teamMemberRepository.findByIdAndTeamId(targetMembershipId, teamId)
@@ -204,7 +204,6 @@ class TeamService(
         val leaderMembershipId = leader.id
         val targetMembership = target.id
         val targetUserId = target.userId
-        val teamName = team.name
 
         // 인자 순서: (membershipId, teamId, expected, next, occurredAt)
         val demoted =
@@ -215,6 +214,9 @@ class TeamService(
             teamMemberRepository.changeRole(targetMembership, teamId, TeamRole.MEMBER, TeamRole.LEADER, now)
         if (promoted == 0) throw BusinessException(ErrorCode.SEARCH_GROUP_STATE_CONFLICT)
 
+        // body = null — Task 5 템플릿이 채운다. team.name 을 그대로 보간하면 사용자가 지은 팀
+        // 이름(전화번호·좌표 등)이 다른 사용자의 알림 행에 새어나갈 수 있어 설계 §9/§16.5 를
+        // 위반한다(브리프 원안의 실수 — 코디네이터 지적, finding 2. 되돌리지 말 것).
         notificationPublisher.notifyUser(
             userId = targetUserId,
             type = NotificationType.TEAM_LEADERSHIP_TRANSFERRED,
@@ -222,7 +224,7 @@ class TeamService(
             postId = null,
             groupId = null,
             teamId = teamId,
-            body = "'$teamName' 팀의 팀장이 되었어요.",
+            body = null,
         )
         // 전임 팀장에게는 결과 확인 알림이 필요하다. actorUserId 를 실어 보내면 publisher 의
         // skipSelf 규칙에 걸려 사라지므로 행위자 없이 발행한다(설계 §9).
@@ -233,7 +235,7 @@ class TeamService(
             postId = null,
             groupId = null,
             teamId = teamId,
-            body = "'$teamName' 팀의 팀장 권한을 넘겼어요.",
+            body = null,
         )
 
         return detailOf(requireTeam(teamId), viewerId = currentLeaderUserId)
