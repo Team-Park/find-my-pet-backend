@@ -15,16 +15,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
+      # actions/cache 는 v1/v2 백엔드가 폐기되어 해당 스텝이 실패한다. cd.yml·version-check.yml 과
+      # 아래 test job 은 이미 v4 를 쓰고 있었고 이 job 만 남아 있었다. distribution 도 레거시 별칭
+      # adopt 대신 정식 이름 temurin 으로 맞춘다.
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: 17
-          distribution: adopt
+          distribution: temurin
 
       - name: Cache Gradle packages
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
