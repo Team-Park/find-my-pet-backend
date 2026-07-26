@@ -135,7 +135,10 @@ class PostQueryRepositoryImpl(
                     isMine(userId),
                 ),
             ).from(post)
-            .where(post.id.eq(postId))
+            // 삭제 필터가 목록 쿼리에만 있고 상세에는 없었다. 그 결과 이용자가 게시글을 지워도
+            // GET /post/{id}(@PublicEndPoint)가 전화번호·주소·좌표를 계속 200으로 내려줬다 —
+            // 목록에서만 사라지니 지워졌다고 오인하게 된다. 삭제는 실제로 접근을 끊어야 한다.
+            .where(post.id.eq(postId).and(post.deletedAt.isNull))
             .fetchOne()
 
     private fun isMine(userId: UUID?) =
@@ -156,7 +159,9 @@ class PostQueryRepositoryImpl(
                     postImage.imageUrl,
                 ),
             ).from(postImage)
-            .where(postImage.post.id.eq(postId))
+            // 같은 누락이 사진에도 있었다. 썸네일 조인(:219)은 걸고 있는데 상세용만 빠져서,
+            // deletePostImage 로 지운 사진이 상세 응답에 계속 실렸다.
+            .where(postImage.post.id.eq(postId).and(postImage.deletedAt.isNull))
             .fetch()
 
     override fun findSummarizedPostsByPage(
