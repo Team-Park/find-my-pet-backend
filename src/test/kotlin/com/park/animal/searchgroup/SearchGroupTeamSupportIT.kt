@@ -70,6 +70,7 @@ import kotlin.test.assertTrue
     TeamService::class,
     TeamMembershipService::class,
     SearchGroupTeamSupportService::class,
+    SearchGroupBlockService::class,
 )
 @Testcontainers
 class SearchGroupTeamSupportIT {
@@ -78,6 +79,8 @@ class SearchGroupTeamSupportIT {
     @Autowired lateinit var teamService: TeamService
 
     @Autowired lateinit var teamMembershipService: TeamMembershipService
+
+    @Autowired lateinit var blockService: SearchGroupBlockService
 
     @Autowired lateinit var postRepository: PostRepository
 
@@ -338,6 +341,154 @@ class SearchGroupTeamSupportIT {
             SearchGroupTeamStatus.PENDING_GROUP_APPROVAL,
             searchGroupTeamRepository.findByIdAndGroupId(supportInA.id, groupA.id)!!.status,
         )
+    }
+
+    /**
+     * 차단 우선 원칙 (설계 §6.3 "차단이 활성인 동안... 팀 파생 권한... 접근을 모두 거부한다", §6.6
+     * "차단은 허용 권한보다 우선한다"). 차단은 그룹 스코프, 팀장 지위는 팀 스코프라 서로 막지 않는다
+     * — 보호자가 팀장을 차단해도 그 팀장은 여전히 다른 곳에서 팀장이다. 이 테스트는 차단된 팀장이
+     * 자신이 이끄는 팀의 지원을 여전히 수락할 수 있는지(있어서는 안 된다)를 확인한다.
+     */
+    @Test
+    fun `차단된 사용자는 팀 지원을 수락할 수 없다`() {
+        val ownerId = UUID.randomUUID()
+        val leaderId = UUID.randomUUID()
+        val group = openGroup(ownerId)
+        val team = teamService.create(leaderId, "팀장", "차단 확인 수색대", null)
+        // 보호자가 요청하면 팀장 승인 대기 — 팀장(leaderId)이 수락하는 경로다.
+        val support = supportService.request(group.id, team.id, ownerId)
+        assertEquals(SearchGroupTeamStatus.PENDING_TEAM_APPROVAL, support.status)
+
+        blockService.block(group.id, leaderId, ownerId, "신뢰할 수 없음")
+
+        val e = assertFailsWith<BusinessException> { supportService.accept(group.id, support.id, leaderId) }
+        assertEquals(
+            ErrorCode.SEARCH_GROUP_ACCESS_DENIED,
+            e.errorCode,
+            "차단된 사용자는 비참여자와 구분되지 않는 403 을 받아야 한다(차단 사실이 새어나가면 안 된다)",
+        )
+
+        assertEquals(
+            SearchGroupTeamStatus.PENDING_TEAM_APPROVAL,
+            searchGroupTeamRepository.findByIdAndGroupId(support.id, group.id)!!.status,
+            "거부된 시도는 행을 건드리지 않는다",
+        )
+    }
+
+    /**
+     * 알림 중복 방지 (설계 §9 "여러 경로로 같은 그룹 권한을 가진 사용자는 알림을 한 번만 받는다").
+     * 그룹 소유와 팀 멤버십은 서로 독립된 축이라, 보호자가 자신의 그룹을 지원하는 팀의 평범한
+     * (팀장이 아닌) 활성 팀원일 수 있다 — 이 경우 `notifyTeamMembers` 와 `notifyOwner` 가 같은
+     * 사람에게 각각 한 행씩 만들면 총 2건이 된다.
+     */
+    @Test
+    fun `보호자가 팀의 활성 팀원이어도 팀 지원 수락 알림은 한 번만 받는다`() {
+        val ownerId = UUID.randomUUID()
+        val leaderId = UUID.randomUUID()
+        val group = openGroup(ownerId)
+        val team = teamService.create(leaderId, "팀장", "혼합 소속 수색대", null)
+        // 보호자가 이 팀의 (팀장이 아닌) 활성 팀원이 된다.
+        val ownerMembership = teamMembershipService.request(team.id, ownerId, "보호자")
+        teamMembershipService.approve(team.id, ownerMembership.id, leaderId)
+
+        // 보호자가 요청하면 PENDING_TEAM_APPROVAL — 팀장이 수락해야 한다(actor != owner 라야
+        // notifyOwner 의 skipSelf 로 우연히 통과하는 경우를 배제할 수 있다).
+        val support = supportService.request(group.id, team.id, ownerId)
+        assertEquals(SearchGroupTeamStatus.PENDING_TEAM_APPROVAL, support.status)
+
+        val accepted = supportService.accept(group.id, support.id, leaderId)
+        assertEquals(SearchGroupTeamStatus.ACTIVE, accepted.status)
+
+        val ownerNotifications =
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notification WHERE user_id = ? AND type = 'TEAM_SUPPORT_ACCEPTED'",
+                Int::class.java,
+                ownerId.toString(),
+            )
+        assertEquals(1, ownerNotifications, "같은 사람이 팀 fan-out 과 보호자 알림 양쪽에서 중복으로 받으면 안 된다")
+    }
+
+    @Test
+    fun `반대편의 대기 상태를 수락하려 하면 409 이고 원본 상태는 그대로다`() {
+        val ownerId = UUID.randomUUID()
+        val leaderId = UUID.randomUUID()
+        val group = openGroup(ownerId)
+        val team = teamService.create(leaderId, "팀장", "교차 수락 확인 수색대", null)
+
+        // 보호자가 요청 -> PENDING_TEAM_APPROVAL, 팀장만 수락할 수 있다. 보호자가 수락을 시도하면 409.
+        val byOwner = supportService.request(group.id, team.id, ownerId)
+        assertEquals(SearchGroupTeamStatus.PENDING_TEAM_APPROVAL, byOwner.status)
+        val e1 = assertFailsWith<BusinessException> { supportService.accept(group.id, byOwner.id, ownerId) }
+        assertEquals(ErrorCode.SEARCH_GROUP_STATE_CONFLICT, e1.errorCode)
+        assertEquals(
+            SearchGroupTeamStatus.PENDING_TEAM_APPROVAL,
+            searchGroupTeamRepository.findByIdAndGroupId(byOwner.id, group.id)!!.status,
+            "행이 훼손되지 않아야 한다",
+        )
+
+        // 다른 그룹에서: 팀장이 요청 -> PENDING_GROUP_APPROVAL, 보호자만 수락할 수 있다.
+        // 팀장이 수락을 시도하면 409.
+        val ownerB = UUID.randomUUID()
+        val groupB = openGroup(ownerB)
+        val byLeader = supportService.request(groupB.id, team.id, leaderId)
+        assertEquals(SearchGroupTeamStatus.PENDING_GROUP_APPROVAL, byLeader.status)
+        val e2 = assertFailsWith<BusinessException> { supportService.accept(groupB.id, byLeader.id, leaderId) }
+        assertEquals(ErrorCode.SEARCH_GROUP_STATE_CONFLICT, e2.errorCode)
+        assertEquals(
+            SearchGroupTeamStatus.PENDING_GROUP_APPROVAL,
+            searchGroupTeamRepository.findByIdAndGroupId(byLeader.id, groupB.id)!!.status,
+            "행이 훼손되지 않아야 한다",
+        )
+    }
+
+    @Test
+    fun `보호자가 팀의 제안을 거절하면 DECLINED 이고 팀장에게 알림이 간다`() {
+        val ownerId = UUID.randomUUID()
+        val leaderId = UUID.randomUUID()
+        val group = openGroup(ownerId)
+        val team = teamService.create(leaderId, "팀장", "거절 확인 수색대", null)
+        val support = supportService.request(group.id, team.id, leaderId)
+        assertEquals(SearchGroupTeamStatus.PENDING_GROUP_APPROVAL, support.status)
+
+        val declined = supportService.decline(group.id, support.id, ownerId)
+        assertEquals(SearchGroupTeamStatus.DECLINED, declined.status)
+
+        val declinedNoti =
+            jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM notification WHERE user_id = ? AND type = 'TEAM_SUPPORT_DECLINED'",
+                Int::class.java,
+                leaderId.toString(),
+            )
+        assertEquals(1, declinedNoti, "거절당한 반대편(팀장)에게 알림이 가야 한다")
+    }
+
+    /**
+     * `list()` 는 `requireRead` 를 쓴다(§20 픽스 라운드 finding 1과 짝을 이루는 finding — 코드
+     * 리뷰). 팀장이 자기 뷰를 보려면 최소한 파생 권한(ACTIVE 지원)이 있어야 하므로, teamA 의 연결만
+     * 활성화해 "팀장은 자기 팀의 연결만 본다" 를 참여 권한이 있는 상태에서 검증한다.
+     */
+    @Test
+    fun `목록 조회는 보호자는 전체를, 팀장은 자기 팀의 연결만 본다`() {
+        val ownerId = UUID.randomUUID()
+        val leaderA = UUID.randomUUID()
+        val leaderB = UUID.randomUUID()
+        val group = openGroup(ownerId)
+        val teamA = teamService.create(leaderA, "팀장A", "A 수색대", null)
+        val teamB = teamService.create(leaderB, "팀장B", "B 수색대", null)
+
+        val supportA = supportService.request(group.id, teamA.id, leaderA)
+        val supportB = supportService.request(group.id, teamB.id, leaderB)
+        supportService.accept(group.id, supportA.id, ownerId)
+
+        val ownerView = supportService.list(group.id, ownerId)
+        assertEquals(
+            setOf(supportA.id, supportB.id),
+            ownerView.map { it.id }.toSet(),
+            "보호자는 대기 중인 연결까지 포함해 전체를 본다",
+        )
+
+        val leaderAView = supportService.list(group.id, leaderA)
+        assertEquals(listOf(supportA.id), leaderAView.map { it.id }, "팀장은 자기 팀의 연결만 본다")
     }
 
     companion object {

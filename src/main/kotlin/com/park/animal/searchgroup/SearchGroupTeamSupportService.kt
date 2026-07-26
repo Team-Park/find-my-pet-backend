@@ -196,12 +196,16 @@ class SearchGroupTeamSupportService(
             targetId = teamId,
             detail = "${expected.name} -> ACTIVE",
         )
+        // 보호자가 이 팀의 활성 팀원이기도 하면(그룹 소유와 팀 멤버십은 서로 독립된 축이다) 아래
+        // notifyOwner 가 보호자에게 따로 알림을 보낸다 — 여기서 함께 세면 같은 사람이 두 행을 받는다
+        // (설계 §9 "여러 경로로 같은 그룹 권한을 가진 사용자는 알림을 한 번만 받는다"). 보호자는
+        // 항상 notifyOwner 하나로만 받도록 팀 fan-out 에서 미리 제외한다.
         notificationPublisher.notifyTeamMembers(
             teamId = teamId,
             groupId = groupId,
             postId = access.postId,
             type = NotificationType.TEAM_SUPPORT_ACCEPTED,
-            excluding = setOf(actorUserId),
+            excluding = setOf(actorUserId, access.ownerUserId),
             actorUserId = actorUserId,
             body = null,
         )
@@ -335,12 +339,14 @@ class SearchGroupTeamSupportService(
             targetId = teamId,
             detail = "ACTIVE -> ${next.name}",
         )
+        // notifyOwner 아래서 보호자를 따로 부르므로, 보호자가 이 팀의 활성 팀원이기도 해도 팀
+        // fan-out 에서는 제외한다 — 같은 사람이 두 행을 받지 않게 한다(설계 §9).
         notificationPublisher.notifyTeamMembers(
             teamId = teamId,
             groupId = groupId,
             postId = access.postId,
             type = NotificationType.TEAM_SUPPORT_ENDED,
-            excluding = setOf(actorUserId),
+            excluding = setOf(actorUserId, access.ownerUserId),
             actorUserId = actorUserId,
             body = null,
         )
@@ -354,13 +360,18 @@ class SearchGroupTeamSupportService(
         return SearchGroupTeamSupportResponse.of(current, team.name)
     }
 
-    /** 보호자는 전체 연결을, 팀장은 자기 팀의 연결만 본다. */
+    /**
+     * 보호자는 전체 연결을, 팀장은 자기 팀의 연결만 본다.
+     *
+     * `requireRead` 를 쓴다 — `SearchGroupMembershipService.list()` 와 같은 규약이다. 차단된
+     * 사용자와, 이 그룹에 대해 어떤 권한도 아직 없는 사용자(role = NONE) 는 조회할 수 없다.
+     */
     @Transactional(readOnly = true)
     fun list(
         groupId: UUID,
         userId: UUID,
     ): List<SearchGroupTeamSupportResponse> {
-        val access = accessResolver.requireVisible(groupId, userId)
+        val access = accessResolver.requireRead(groupId, userId)
         // Task 2 의 findAllByGroupIdOrderByCreatedAtDescIdDesc 는 Pageable 을 받지 않는다
         // (TeamMemberRepository 의 동일 이름 메서드와 같은 규약) — 상한은 여기서 take() 로 건다.
         val rows =
@@ -532,6 +543,11 @@ class SearchGroupTeamSupportService(
         userId: UUID,
     ): GroupAccess {
         val access = accessResolver.requireVisible(groupId, userId)
+        // 차단이 활성인 동안 직접 가입뿐 아니라 팀 파생 권한에 대한 관리 레버(요청·수락·거절·종료)도
+        // 모두 거부한다(설계 §6.3 "차단이 활성인 동안... 팀 파생 권한... 접근을 모두 거부한다", §6.6
+        // "차단은 허용 권한보다 우선한다"). 비참여자와 같은 403 이어야 차단 사실이 응답으로 새어나가지
+        // 않는다 — `SearchGroupMembershipService.joinRejection`/`leaveMe` 와 동일한 순서·코드다.
+        if (access.blocked) throw BusinessException(ErrorCode.SEARCH_GROUP_ACCESS_DENIED)
         if (access.groupStatus != SearchGroupStatus.ACTIVE) throw BusinessException(ErrorCode.SEARCH_ALREADY_ENDED)
         return access
     }
