@@ -98,7 +98,7 @@ class SearchGroupBlockService(
                     occurredAt = now,
                 )
             didBlock = affected != 0
-            updateReasonOnly(blockId, groupId, reasonText)
+            updateReasonOnly(blockId, groupId, reasonText, now)
         }
 
         // 대상의 직접 멤버십이 살아 있으면 함께 종료한다. 파생(팀) 권한은 access 쿼리가 즉시 차단한다.
@@ -190,19 +190,28 @@ class SearchGroupBlockService(
     ): String? = memberRepository.findByGroupIdAndUserId(groupId, userId)?.userName
 
     /**
-     * `reason` 컬럼만 건드리는 targeted UPDATE. `SearchGroupUserBlockRepository` 를 고치지 않고도
-     * (Task 2 계약 준수) 엔티티 전체를 mutate+save 할 때 생기는 lost-update 위험 없이 반영한다 —
-     * 클래스 KDoc 참고.
+     * `reason`(과 `updatedAt`)만 건드리는 targeted UPDATE. `SearchGroupUserBlockRepository` 를
+     * 고치지 않고도(Task 2 계약 준수) 엔티티 전체를 mutate+save 할 때 생기는 lost-update 위험 없이
+     * 반영한다 — 클래스 KDoc 참고.
+     *
+     * `updatedAt` 을 함께 찍는 이유: 벌크 JPQL UPDATE 는 `@LastModifiedDate` 리스너를 우회하므로
+     * (그 리스너는 Hibernate 이벤트에 걸려 있고 벌크 UPDATE 는 그 이벤트를 발생시키지 않는다),
+     * `reactivate`/`deactivate` 가 각자 `updatedAt` 을 명시적으로 SET 하는 것과 같은 이유로 여기서도
+     * 명시해야 한다 — 그렇지 않으면 이미 차단 중인 사용자의 reason 만 바꾼 뒤에도 `updated_at` 이
+     * 예전 차단 시각에 머물러, 그 컬럼을 "마지막으로 손댄 시각"으로 신뢰하는 감사 화면이 틀리게 된다.
      */
     private fun updateReasonOnly(
         blockId: UUID,
         groupId: UUID,
         reasonText: String?,
+        occurredAt: LocalDateTime,
     ) {
         entityManager
             .createQuery(
-                "UPDATE SearchGroupUserBlock b SET b.reason = :reason WHERE b.id = :blockId AND b.groupId = :groupId",
+                "UPDATE SearchGroupUserBlock b SET b.reason = :reason, b.updatedAt = :occurredAt " +
+                    "WHERE b.id = :blockId AND b.groupId = :groupId",
             ).setParameter("reason", reasonText)
+            .setParameter("occurredAt", occurredAt)
             .setParameter("blockId", blockId)
             .setParameter("groupId", groupId)
             .executeUpdate()
