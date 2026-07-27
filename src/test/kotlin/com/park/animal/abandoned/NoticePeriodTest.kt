@@ -55,4 +55,30 @@ class NoticePeriodTest {
         assertFalse(NoticePeriod.isOver("202607", today))
         assertFalse(NoticePeriod.isOver("20260727x", today))
     }
+
+    @Test
+    fun `공고기간이 법정 최소치보다 짧으면 만료로 보지 않는다 - 상류 입력 오류`() {
+        val today = NoticePeriod.today(crossover) // 20260728
+
+        // 실제 사례: 413582202600529 — 7/26 에 발견된 고양이인데 공고종료일도 7/26.
+        // notice_edt(20260726) < today 이지만 공고기간이 0일이라 상류 데이터를 믿을 수 없다.
+        assertFalse(
+            NoticePeriod.isOver("20260726", today, noticeSdt = "20260726"),
+            "공고기간 0일짜리를 만료로 보면 어제 구조된 아이가 오늘 사라진다",
+        )
+        assertFalse(NoticePeriod.isOver("20260720", today, noticeSdt = "20260715"), "5일짜리도 법정 미만이다")
+
+        // 7일 이상이면 정상 데이터로 보고 판정한다.
+        assertTrue(NoticePeriod.isOver("20260722", today, noticeSdt = "20260715"), "7일짜리는 정상 공고다")
+        assertTrue(NoticePeriod.isOver("20260727", today, noticeSdt = "20260717"), "10일짜리는 정상 공고다")
+    }
+
+    @Test
+    fun `notice_sdt 로 교차 검증할 수 없으면 notice_edt 만으로 판정한다`() {
+        val today = NoticePeriod.today(crossover)
+        // 시작일을 모르면 기간을 잴 수 없다. 그렇다고 전부 살려두면 만료 처리 자체가 무의미해지므로
+        // 이때는 종전대로 notice_edt 단독 판정으로 돌아간다.
+        assertTrue(NoticePeriod.isOver("20260726", today, noticeSdt = null))
+        assertTrue(NoticePeriod.isOver("20260726", today, noticeSdt = "2026-07-16"))
+    }
 }

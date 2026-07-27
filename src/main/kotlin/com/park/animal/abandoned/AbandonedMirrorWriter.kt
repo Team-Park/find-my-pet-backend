@@ -128,7 +128,7 @@ class AbandonedMirrorWriter(
         today: String,
     ): Boolean =
         candidate.processState?.startsWith("종료") == true ||
-            NoticePeriod.isOver(candidate.noticeEdt, today)
+            NoticePeriod.isOver(candidate.noticeEdt, today, candidate.noticeSdt)
 
     /**
      * 신규 등록 동물에 대해 매칭되는 구독자에게 알림 fanout.

@@ -104,6 +104,7 @@ class AbandonedNoticeExpiryIT {
         processState: String = "보호중",
         animalType: String = "DOG",
         closedAt: java.time.LocalDateTime? = null,
+        noticeSdt: String? = null,
     ): AbandonedAnimal =
         abandonedAnimalRepository.save(
             AbandonedAnimal(
@@ -124,7 +125,7 @@ class AbandonedNoticeExpiryIT {
                 careAddr = "서울특별시 강남구",
                 processState = processState,
                 noticeNo = null,
-                noticeSdt = "20260401",
+                noticeSdt = noticeSdt,
                 noticeEdt = noticeEdt,
                 closedAt = closedAt,
             ),
@@ -441,6 +442,26 @@ class AbandonedNoticeExpiryIT {
         hasNextPage = false,
         totalCount = 1,
     )
+
+
+    @Test
+    fun `공고기간이 법정 최소치보다 짧으면 만료 배치가 건드리지 않는다 - SQL 경로`() {
+        // 실제 사례 413582202600529: 7/26 발견인데 공고종료일도 7/26 (기간 0일).
+        // notice_edt < today 라 종전 쿼리는 이걸 만료시켰고, 어제 구조된 아이가 목록에서 사라졌다.
+        seed("ZERO-SPAN", noticeEdt = yesterday, noticeSdt = yesterday)
+        seed("SHORT-SPAN", noticeEdt = yesterday, noticeSdt = baseDate.minusDays(4).format(DateTimeFormatter.BASIC_ISO_DATE))
+        seed("NORMAL-SPAN", noticeEdt = yesterday, noticeSdt = baseDate.minusDays(11).format(DateTimeFormatter.BASIC_ISO_DATE))
+        seed("NO-SDT", noticeEdt = yesterday, noticeSdt = null)
+
+        val closed = expiryService().expireOverdueNotices(today)
+
+        assertNull(reload("ZERO-SPAN").closedAt, "공고기간 0일짜리가 만료됐다 — 상류 입력 오류를 그대로 믿었다")
+        assertNull(reload("SHORT-SPAN").closedAt, "법정 최소치 미만(3일)이 만료됐다")
+        assertNotNull(reload("NORMAL-SPAN").closedAt, "정상 공고(11일)는 만료돼야 한다")
+        // 시작일을 모르면 교차 검증을 못 하므로 notice_edt 단독 판정으로 돌아간다.
+        assertNotNull(reload("NO-SDT").closedAt, "notice_sdt 가 없으면 종전대로 판정한다")
+        assertEquals(2, closed, "만료 대상은 NORMAL-SPAN 과 NO-SDT 둘뿐이다")
+    }
 
     companion object {
         @Container

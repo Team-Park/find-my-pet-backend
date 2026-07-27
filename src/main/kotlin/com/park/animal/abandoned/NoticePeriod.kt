@@ -4,6 +4,7 @@ import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 /**
  * 공공데이터 공고기간(`notice_sdt` ~ `notice_edt`) 판정.
@@ -40,16 +41,50 @@ object NoticePeriod {
         LocalDate.now(clock.withZone(ZONE)).format(DateTimeFormatter.BASIC_ISO_DATE)
 
     /**
+     * 법정 최소 공고기간(일). 동물보호법상 공고 후 7일이 지나야 소유권이 넘어간다.
+     *
+     * 상류가 이보다 짧은 기간을 주면 **데이터가 틀린 것이지 공고가 진짜 끝난 게 아니다.**
+     */
+    private const val MIN_NOTICE_DAYS = 7L
+
+    /**
      * 공고기간이 [today] 기준으로 이미 끝났는지.
      *
-     * 값이 없거나 `YYYYMMDD` 8자리 숫자가 아니면 **만료로 보지 않는다** — 판정 불가를 종료로
-     * 취급하면 아직 보호소에 있는 아이가 목록에서 사라진다. 모르면 남기는 쪽이 안전하다.
+     * ## 판정 불가는 만료로 보지 않는다
+     *
+     * 값이 없거나 `YYYYMMDD` 8자리가 아니면 만료로 보지 않는다. 판정 불가를 종료로 취급하면
+     * 아직 보호소에 있는 아이가 목록에서 사라진다. 모르면 남기는 쪽이 안전하다.
+     *
+     * ## 형식은 맞는데 값이 말이 안 되는 경우도 판정 불가다
+     *
+     * 상류에는 `happenDt = noticeSdt = noticeEdt` 인, 즉 **공고기간이 0일**인 레코드가 실제로 있다
+     * (2026-07-27 실측: 표본 1,600건 중 73건 = 4.6%). 예: `413582202600529` 는 7/26 에 발견된
+     * 고양이인데 공고종료일도 7/26 이다. 법정 기간이 7일 이상인데 0일일 수는 없으므로 이건
+     * 상류 입력 오류다. 그대로 믿으면 **어제 구조된 아이가 오늘 목록에서 사라진다** —
+     * 실제로 최근 10일 내 발견분 53건이 이렇게 숨겨졌다.
+     *
+     * 그래서 [noticeSdt] 를 함께 받아 공고기간이 법정 최소치([MIN_NOTICE_DAYS])보다 짧으면
+     * 만료로 보지 않는다. 형식 검사와 같은 이유이고 같은 방향이다 — **의심스러우면 남긴다.**
+     * [noticeSdt] 가 없거나 형식 불량이면 교차 검증을 못 하므로 [noticeEdt] 만으로 판정한다.
      */
     fun isOver(
         noticeEdt: String?,
         today: String = today(),
+        noticeSdt: String? = null,
     ): Boolean {
         if (noticeEdt == null || !YYYYMMDD.matches(noticeEdt)) return false
-        return noticeEdt < today
+        if (noticeEdt >= today) return false
+        return !isImplausiblyShort(noticeSdt, noticeEdt)
+    }
+
+    /** 공고기간이 법정 최소치보다 짧은가 = 상류 데이터를 믿을 수 없는가. */
+    private fun isImplausiblyShort(
+        noticeSdt: String?,
+        noticeEdt: String,
+    ): Boolean {
+        if (noticeSdt == null || !YYYYMMDD.matches(noticeSdt)) return false
+        val start = runCatching { LocalDate.parse(noticeSdt, DateTimeFormatter.BASIC_ISO_DATE) }.getOrNull() ?: return false
+        val end = runCatching { LocalDate.parse(noticeEdt, DateTimeFormatter.BASIC_ISO_DATE) }.getOrNull() ?: return false
+        return ChronoUnit.DAYS.between(start, end) < MIN_NOTICE_DAYS
     }
 }

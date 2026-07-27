@@ -104,6 +104,16 @@ interface AbandonedAnimalRepository : JpaRepository<AbandonedAnimal, UUID> {
           AND CHAR_LENGTH(notice_edt) = 8
           AND notice_edt REGEXP '^[0-9]{8}'
           AND notice_edt < :today
+          -- 공고기간이 법정 최소치(7일)보다 짧으면 상류 입력 오류로 보고 제외한다.
+          -- happenDt = noticeSdt = noticeEdt 인 0일짜리 레코드가 실제로 4.6% 있고, 그대로 믿으면
+          -- 어제 구조된 아이가 오늘 사라진다. notice_sdt 가 없거나 형식 불량이면 교차 검증을
+          -- 할 수 없으므로 notice_edt 만으로 판정한다(= 이 조건을 통과시킨다).
+          AND (
+            notice_sdt IS NULL
+            OR CHAR_LENGTH(notice_sdt) <> 8
+            OR notice_sdt NOT REGEXP '^[0-9]{8}'
+            OR DATEDIFF(STR_TO_DATE(notice_edt, '%Y%m%d'), STR_TO_DATE(notice_sdt, '%Y%m%d')) >= 7
+          )
         LIMIT :limit
         """,
         nativeQuery = true,
