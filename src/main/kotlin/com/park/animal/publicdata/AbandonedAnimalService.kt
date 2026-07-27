@@ -2,6 +2,7 @@ package com.park.animal.publicdata
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.park.animal.abandoned.NoticeStatus
 import com.park.animal.abandoned.entity.AbandonedAnimal
 import com.park.animal.abandoned.repository.AbandonedAnimalRepository
 import com.park.animal.publicdata.dto.AbandonedAnimalPage
@@ -48,21 +49,23 @@ class AbandonedAnimalService(
         endde: String?,
         uprCd: String? = null,
         orgCd: String? = null,
+        noticeStatus: NoticeStatus = NoticeStatus.OPEN,
     ): AbandonedAnimalPage {
         // 로컬 mirror 가 비어 있으면 (sync 전 부팅 직후) data.go.kr 직접 호출로 fallback.
-        if (abandonedAnimalRepository.count() == 0L) {
+        // 직결 응답에는 우리의 closed_at 개념이 아예 없으므로 OPEN 이외의 상태 조회는 fallback 대상이 아니다.
+        if (noticeStatus == NoticeStatus.OPEN && abandonedAnimalRepository.count() == 0L) {
             log.info("local abandoned mirror is empty — falling back to direct data.go.kr call")
             return fetchDirect(animalType, pageNo, numOfRows, bgnde, endde, uprCd, orgCd)
         }
 
         val pageable = PageRequest.of((pageNo - 1).coerceAtLeast(0), numOfRows.coerceAtLeast(1))
+        val type = animalType?.uppercase()
         val page =
-            abandonedAnimalRepository.findOpenByFilters(
-                animalType = animalType?.uppercase(),
-                uprCd = uprCd,
-                orgCd = orgCd,
-                pageable = pageable,
-            )
+            when (noticeStatus) {
+                NoticeStatus.OPEN -> abandonedAnimalRepository.findOpenByFilters(type, uprCd, orgCd, pageable)
+                NoticeStatus.CLOSED -> abandonedAnimalRepository.findClosedByFilters(type, uprCd, orgCd, pageable)
+                NoticeStatus.ALL -> abandonedAnimalRepository.findAnyByFilters(type, uprCd, orgCd, pageable)
+            }
 
         return AbandonedAnimalPage(
             contents = page.content.map(::toResponse),
@@ -96,7 +99,12 @@ class AbandonedAnimalService(
         return page
     }
 
-    /** 단건 조회 — local mirror 에서 desertionNo 매칭. */
+    /**
+     * 단건 조회 — local mirror 에서 desertionNo 매칭.
+     *
+     * 공고가 종료된 항목도 그대로 200 으로 반환한다. 이미 색인된 상세 URL 이 2만건 이상이라
+     * 404 로 만들면 안 되고, 대신 응답의 `noticeClosed` 로 프론트가 안내 배너 + noindex 를 판정한다.
+     */
     fun findByDesertionNo(desertionNo: String): AbandonedAnimalResponse? =
         abandonedAnimalRepository.findByDesertionNo(desertionNo)?.let(::toResponse)
 
@@ -121,6 +129,8 @@ class AbandonedAnimalService(
             noticeEdt = a.noticeEdt,
             animalType = a.animalType,
             orgNm = null,
+            noticeClosed = a.closedAt != null,
+            noticeClosedAt = a.closedAt,
         )
 
     /** 시도 목록 — 24h 캐시. */

@@ -1,36 +1,35 @@
 package com.park.animal.abandoned
 
 import com.park.animal.abandoned.entity.AbandonedAnimal
-import com.park.animal.abandoned.repository.AbandonedAnimalRepository
-import com.park.animal.abandoned.repository.AbandonedSubscriptionRepository
-import com.park.animal.notification.NotificationService
-import com.park.animal.notification.entity.NotificationType
 import com.park.animal.publicdata.PublicDataClient
 import com.park.animal.publicdata.dto.AbandonedAnimalResponse
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
-import java.time.LocalDateTime
 
+/**
+ * 공공데이터 유기동물 목록을 미러로 끌어오는 스케줄러.
+ *
+ * **네트워크 수집만 담당한다.** DB 반영은 [AbandonedMirrorWriter], 공고 만료는
+ * [AbandonedNoticeExpiryService] 가 각각 별도 빈으로 처리한다.
+ *
+ * 이렇게 나눈 이유는 [AbandonedMirrorWriter] 의 주석에 적었다 — 요약하면 `@Transactional` 은
+ * (1) 자기 호출(`this.sync()`)에는 프록시가 없어 적용되지 않고, (2) `suspend fun` 에서는
+ * 트랜잭션이 `ThreadLocal` 에 묶이므로 코루틴 스레드 전환과 함께 무의미해진다.
+ * 그래서 수집은 코루틴, 반영은 평범한 블로킹 트랜잭션으로 분리했다.
+ */
 @Service
 class AbandonedAnimalSyncService(
     private val publicDataClient: PublicDataClient,
-    private val abandonedAnimalRepository: AbandonedAnimalRepository,
-    private val subscriptionRepository: AbandonedSubscriptionRepository,
-    private val notificationService: NotificationService,
     private val regionLookupService: RegionLookupService,
+    private val mirrorWriter: AbandonedMirrorWriter,
+    private val noticeExpiryService: AbandonedNoticeExpiryService,
 ) {
     companion object {
         private const val PAGE_SIZE = 500
         // 안전 상한 — 보호중 표본이 25,000 이상이면 별도 검토. 응답 totalCount 따라 동적으로 더 작게 조정됨.
         private const val MAX_PAGES = 50
-        private const val ALERT_BURST_CAP_PER_USER = 5
-
-        // 한 sync 에서 stale 비율이 이 임계 초과 + openLocal 충분히 클 때 → close 스킵 (data.go.kr silent breaking change 방어).
-        private const val STALE_GUARD_RATIO = 0.5
-        private const val STALE_GUARD_MIN_OPEN = 100
     }
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -38,26 +37,39 @@ class AbandonedAnimalSyncService(
     /** 1시간 주기 sync. 첫 실행은 부팅 후 30초 뒤 (local DB 빠르게 채우기). */
     @Scheduled(initialDelay = 30_000, fixedDelay = 60L * 60_000)
     fun runSync() {
-        runBlocking {
-            try {
-                val report = sync()
-                log.info(
-                    "abandoned sync done: fetched={} inserted={} updated={} closed={} fanout={}",
-                    report.fetched,
-                    report.inserted,
-                    report.updated,
-                    report.closed,
-                    report.fanout,
-                )
-            } catch (e: Exception) {
-                log.error("abandoned sync failed", e)
-            }
+        // 판정 기준 날짜는 한 사이클에 한 번만 읽는다. 수집이 오래 걸려 자정을 넘기면
+        // 앞뒤 항목이 다른 날짜로 판정돼 일관성이 깨진다.
+        val today = NoticePeriod.today()
+
+        try {
+            // 네트워크만 코루틴에서. 이 구간에는 트랜잭션도 DB 커넥션도 잡지 않는다.
+            val fetched = runBlocking { fetchAll() }
+            // 반영은 다른 빈의 논-suspend @Transactional — 프록시를 정상 경유한다.
+            val report = mirrorWriter.applyDiff(fetched, today)
+            log.info(
+                "abandoned sync done: fetched={} inserted={} updated={} closed={} fanout={}",
+                report.fetched,
+                report.inserted,
+                report.updated,
+                report.closed,
+                report.fanout,
+            )
+        } catch (e: Exception) {
+            log.error("abandoned sync failed", e)
+        }
+
+        // 공고 만료는 상류 응답이 아니라 우리가 가진 notice_edt 로만 판정하므로
+        // sync 성공 여부·stale guard 와 무관하게 항상 돌아야 한다.
+        try {
+            val expired = noticeExpiryService.expireOverdueNotices(today)
+            if (expired > 0) log.info("abandoned notice expiry: closed={}", expired)
+        } catch (e: Exception) {
+            log.error("abandoned notice expiry failed", e)
         }
     }
 
-    @Transactional
-    suspend fun sync(): SyncReport {
-        // 1. 첫 페이지 fetch 로 totalCount 확인 → 필요한 페이지 수만 순회.
+    /** 상류 전 페이지를 모아 `desertionNo -> 엔티티` 로 돌려준다. DB 를 건드리지 않는다. */
+    suspend fun fetchAll(): Map<String, AbandonedAnimal> {
         val fetched = mutableMapOf<String, AbandonedAnimal>()
         val firstPage =
             publicDataClient.fetchAbandonedAnimals(
@@ -78,103 +90,19 @@ class AbandonedAnimalSyncService(
         log.debug("abandoned sync — totalCount={} → totalPages={}", firstPage.totalCount, totalPages)
 
         for (page in 2..totalPages) {
-            val resp = publicDataClient.fetchAbandonedAnimals(
-                upkind = null,
-                pageNo = page,
-                numOfRows = PAGE_SIZE,
-                bgnde = null,
-                endde = null,
-            )
+            val resp =
+                publicDataClient.fetchAbandonedAnimals(
+                    upkind = null,
+                    pageNo = page,
+                    numOfRows = PAGE_SIZE,
+                    bgnde = null,
+                    endde = null,
+                )
             if (resp.contents.isEmpty()) break
-            resp.contents.forEach { item ->
-                fetched[item.desertionNo] = toEntity(item)
-            }
+            resp.contents.forEach { item -> fetched[item.desertionNo] = toEntity(item) }
             if (!resp.hasNextPage) break
         }
-
-        // 2. 신규 / 갱신 / 종료 분류
-        val openLocal = abandonedAnimalRepository.findOpenDesertionNos().toSet()
-        val fetchedKeys = fetched.keys
-
-        val newDesertionNos = fetchedKeys - openLocal
-        val staleDesertionNos = openLocal - fetchedKeys
-
-        var inserted = 0
-        var updated = 0
-        var fanout = 0
-
-        for (no in newDesertionNos) {
-            val candidate = fetched[no] ?: continue
-            // 이전에 close 됐다가 다시 등장한 케이스도 동일 desertion_no UNIQUE 제약상 별 케이스 — 기존 row 갱신.
-            val existing = abandonedAnimalRepository.findByDesertionNo(no)
-            if (existing != null) {
-                existing.mergeFrom(candidate)
-                existing.closedAt = null
-                updated++
-            } else {
-                abandonedAnimalRepository.save(candidate)
-                inserted++
-                fanout += notifySubscribers(candidate)
-            }
-        }
-
-        // 갱신 (이미 open 인데 응답에 또 있는 항목 — process_state 등 변경 가능)
-        for (no in fetchedKeys.intersect(openLocal)) {
-            val candidate = fetched[no] ?: continue
-            val existing = abandonedAnimalRepository.findByDesertionNo(no) ?: continue
-            existing.mergeFrom(candidate)
-            // 종료 상태로 바뀐 경우 close.
-            if (candidate.processState?.startsWith("종료") == true && existing.closedAt == null) {
-                existing.closedAt = LocalDateTime.now()
-            }
-            updated++
-        }
-
-        // stale: 응답에 없는 open → close.
-        // ★ data.go.kr 응답 이상(키 만료/스키마 변경/일시 부분 응답) 으로 stale 비율이 비정상 일 때 close 스킵.
-        var closed = 0
-        val staleRatio =
-            if (openLocal.isEmpty()) 0.0 else staleDesertionNos.size.toDouble() / openLocal.size
-        if (staleRatio > STALE_GUARD_RATIO && openLocal.size >= STALE_GUARD_MIN_OPEN) {
-            log.warn(
-                "stale guard tripped — staleRatio={}, openLocal={}, stale={}. close skipped.",
-                staleRatio,
-                openLocal.size,
-                staleDesertionNos.size,
-            )
-        } else {
-            for (no in staleDesertionNos) {
-                val existing = abandonedAnimalRepository.findByDesertionNo(no) ?: continue
-                existing.close()
-                closed++
-            }
-        }
-
-        return SyncReport(fetched.size, inserted, updated, closed, fanout)
-    }
-
-    /**
-     * 신규 등록 동물에 대해 매칭되는 구독자에게 알림 fanout.
-     * 사용자 폭증 방지: 사용자당 1회 sync 에 최대 [ALERT_BURST_CAP_PER_USER] 건만 전송.
-     */
-    private fun notifySubscribers(animal: AbandonedAnimal): Int {
-        val matchedUsers =
-            subscriptionRepository.findUserIdsMatching(
-                uprCd = animal.uprCd ?: return 0,
-                orgCd = animal.orgCd,
-                animalType = animal.animalType,
-            )
-        if (matchedUsers.isEmpty()) return 0
-
-        // burst cap: 단순화 위해 sync 1회당 user 별 카운트 — 실제 운영에서 batch grouping 으로 개선 여지.
-        notificationService.createMany(
-            userIds = matchedUsers,
-            type = NotificationType.ABANDONED_NEW_IN_REGION,
-            title = "관심 지역에 신규 유기동물이 등록됐어요",
-            body = "${animal.kindFullNm ?: "유기동물"} (${animal.happenPlace ?: ""})",
-            link = "/abandonment/${animal.desertionNo}",
-        )
-        return matchedUsers.size
+        return fetched
     }
 
     private fun toEntity(r: AbandonedAnimalResponse): AbandonedAnimal {
@@ -202,11 +130,4 @@ class AbandonedAnimalSyncService(
         )
     }
 
-    data class SyncReport(
-        val fetched: Int,
-        val inserted: Int,
-        val updated: Int,
-        val closed: Int,
-        val fanout: Int,
-    )
 }

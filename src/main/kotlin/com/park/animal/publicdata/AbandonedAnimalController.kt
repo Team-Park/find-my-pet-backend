@@ -1,6 +1,7 @@
 package com.park.animal.publicdata
 
 import annotation.PublicEndPoint
+import com.park.animal.abandoned.NoticeStatus
 import com.park.animal.publicdata.dto.AbandonedAnimalResponse
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -22,7 +23,8 @@ class AbandonedAnimalController(
         summary = "구조(유기)동물 목록 — 공공데이터 proxy",
         description =
             "국가동물보호정보시스템(data.go.kr) 구조동물 조회 서비스를 백엔드 캐싱(Redis 5분) + " +
-                "HTTPS 래핑으로 제공. 서비스 키는 서버 내부에만 존재.",
+                "HTTPS 래핑으로 제공. 서비스 키는 서버 내부에만 존재. " +
+                "기본은 진행중(noticeStatus=OPEN) 공고만 반환하며, 법정 공고기간(noticeEdt)이 지난 항목은 제외된다.",
     )
     suspend fun getAbandonedAnimals(
         @Parameter(description = "DOG | CAT | OTHER — 생략 시 전체")
@@ -37,8 +39,24 @@ class AbandonedAnimalController(
         @RequestParam("uprCd", required = false) uprCd: String?,
         @Parameter(description = "시군구 코드")
         @RequestParam("orgCd", required = false) orgCd: String?,
+        @Parameter(
+            description =
+                "공고 상태 OPEN | CLOSED | ALL. 기본 OPEN(진행중). " +
+                    "공고기간이 끝난 항목은 OPEN 에서 제외되지만 상세 조회는 계속 200. 인식 불가 값은 OPEN 으로 처리.",
+        )
+        @RequestParam("noticeStatus", required = false, defaultValue = "OPEN") noticeStatus: String,
     ): PaginatedApiResponseBody<AbandonedAnimalResponse> {
-        val page = abandonedAnimalService.findAbandonedAnimals(animalType, pageNo, numOfRows, bgnde, endde, uprCd, orgCd)
+        val page =
+            abandonedAnimalService.findAbandonedAnimals(
+                animalType = animalType,
+                pageNo = pageNo,
+                numOfRows = numOfRows,
+                bgnde = bgnde,
+                endde = endde,
+                uprCd = uprCd,
+                orgCd = orgCd,
+                noticeStatus = NoticeStatus.from(noticeStatus),
+            )
         return PaginatedApiResponseBody(
             data =
                 PaginatedApiResponseDto(
@@ -53,7 +71,10 @@ class AbandonedAnimalController(
     @GetMapping("/abandoned-animals/{desertionNo}")
     @Operation(
         summary = "유기동물 단건 조회 (로컬 mirror)",
-        description = "SEO/SSR 용. desertionNo path param 으로 단건 조회. 미존재 또는 closed 항목은 404.",
+        description =
+            "SEO/SSR 용. desertionNo path param 으로 단건 조회. mirror 에 없는 항목만 404 이고, " +
+                "공고가 종료된 항목도 200 으로 반환한다(이미 색인된 URL 을 죽이지 않는다). " +
+                "종료 여부는 응답의 noticeClosed / noticeClosedAt 으로 판단한다.",
     )
     suspend fun getOne(
         @org.springframework.web.bind.annotation.PathVariable desertionNo: String,

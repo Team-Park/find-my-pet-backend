@@ -101,6 +101,7 @@ class SearchController(
                     thumbnail = it.popfile,
                     date = null,
                     link = "/abandonment/${it.desertionNo}",
+                    noticeClosed = it.closedAt != null,
                 )
             }
         }
@@ -188,6 +189,14 @@ class SearchController(
         val thumbnail: String? = null,
         val date: LocalDateTime? = null,
         val link: String,
+        /**
+         * 공고 기간이 끝났는지 (ABANDONED 만 해당, LOST 는 항상 false).
+         *
+         * 검색은 종료분도 함께 돌려준다 — 공고가 끝났다고 아이가 보호소에서 사라진 게 아니고,
+         * 여기서 숨기면 보호자가 "보호소에 없구나" 하고 포기한다. 대신 화면이 구분해 보여줄 수
+         * 있도록 상태를 실어 보낸다.
+         */
+        val noticeClosed: Boolean = false,
     )
 
     companion object {
