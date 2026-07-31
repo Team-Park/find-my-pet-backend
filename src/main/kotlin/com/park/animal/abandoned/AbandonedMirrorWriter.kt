@@ -51,7 +51,9 @@ class AbandonedMirrorWriter(
     fun applyDiff(
         fetched: Map<String, AbandonedAnimal>,
         today: String,
+        allowStaleClose: Boolean,
     ): SyncReport {
+        val closedAt = LocalDateTime.now(NoticePeriod.ZONE)
         val openLocal = abandonedAnimalRepository.findOpenDesertionNos().toSet()
         val fetchedKeys = fetched.keys
 
@@ -60,6 +62,7 @@ class AbandonedMirrorWriter(
 
         var inserted = 0
         var updated = 0
+        var closed = 0
         var fanout = 0
 
         for (no in newDesertionNos) {
@@ -67,19 +70,29 @@ class AbandonedMirrorWriter(
             // 이전에 close 됐다가 다시 등장한 케이스도 desertion_no UNIQUE 제약상 같은 row 다.
             val existing = abandonedAnimalRepository.findByDesertionNo(no)
             if (existing != null) {
+                val noticeOver = isNoticeOver(candidate, today)
                 existing.mergeFrom(candidate)
                 // 상류에 다시 나타났다는 이유만으로 무조건 재오픈하면 안 된다.
                 // openLocal 은 사전 스냅샷이라 여기서 재오픈된 항목은 같은 사이클의 close 루프에
                 // 들어가지 않는다 → 한 주기는 open, 다음 주기에 close, 그 다음에 또 open 하는 진동이 된다.
                 // 상류가 만료분을 계속 돌려주므로 이 가드가 없으면 만료 처리가 매시간 무효화된다.
                 // 공고기간이 갱신돼 실제로 다시 진행중이 된 경우에만 되살린다(만료의 되돌림 경로).
-                if (!isNoticeOver(candidate, today)) existing.closedAt = null
+                if (noticeOver) {
+                    existing.close(closedAt)
+                } else {
+                    existing.closedAt = null
+                }
                 updated++
             } else {
+                val noticeOver = isNoticeOver(candidate, today)
+                if (noticeOver) {
+                    candidate.close(closedAt)
+                    closed++
+                }
                 abandonedAnimalRepository.save(candidate)
                 inserted++
-                // 이미 공고가 끝난 항목으로 알림을 보내면 없는 아이 때문에 보호소에 연락하게 된다.
-                if (!isNoticeOver(candidate, today)) fanout += notifySubscribers(candidate)
+                // 종료·미제공 공고에 신규 알림을 보내면 이용자가 현재 상태를 오해할 수 있다.
+                if (!noticeOver) fanout += notifySubscribers(candidate)
             }
         }
 
@@ -88,18 +101,26 @@ class AbandonedMirrorWriter(
             val candidate = fetched[no] ?: continue
             val existing = abandonedAnimalRepository.findByDesertionNo(no) ?: continue
             existing.mergeFrom(candidate)
-            if (candidate.processState?.startsWith("종료") == true && existing.closedAt == null) {
-                existing.closedAt = LocalDateTime.now(NoticePeriod.ZONE)
+            if (isNoticeOver(candidate, today)) {
+                existing.close(closedAt)
+                closed++
+            } else {
+                existing.closedAt = null
             }
             updated++
         }
 
         // stale: 응답에 없는 open → close.
         // data.go.kr 응답 이상(키 만료/스키마 변경/일시 부분 응답)으로 stale 비율이 비정상이면 건너뛴다.
-        var closed = 0
         val staleRatio =
             if (openLocal.isEmpty()) 0.0 else staleDesertionNos.size.toDouble() / openLocal.size
-        if (staleRatio > STALE_GUARD_RATIO && openLocal.size >= STALE_GUARD_MIN_OPEN) {
+        if (!allowStaleClose) {
+            log.warn(
+                "stale close skipped — upstream snapshot incomplete. openLocal={}, staleCandidates={}",
+                openLocal.size,
+                staleDesertionNos.size,
+            )
+        } else if (staleRatio > STALE_GUARD_RATIO && openLocal.size >= STALE_GUARD_MIN_OPEN) {
             log.warn(
                 "stale guard tripped — staleRatio={}, openLocal={}, stale={}. close skipped.",
                 staleRatio,
@@ -109,7 +130,7 @@ class AbandonedMirrorWriter(
         } else {
             for (no in staleDesertionNos) {
                 val existing = abandonedAnimalRepository.findByDesertionNo(no) ?: continue
-                existing.close()
+                existing.close(closedAt)
                 closed++
             }
         }
@@ -128,7 +149,7 @@ class AbandonedMirrorWriter(
         today: String,
     ): Boolean =
         candidate.processState?.startsWith("종료") == true ||
-            NoticePeriod.isOver(candidate.noticeEdt, today, candidate.noticeSdt)
+            NoticePeriod.isOver(candidate.noticeEdt, today, candidate.noticeSdt, candidate.happenDt)
 
     /**
      * 신규 등록 동물에 대해 매칭되는 구독자에게 알림 fanout.

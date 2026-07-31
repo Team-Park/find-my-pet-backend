@@ -17,7 +17,7 @@ import java.time.LocalDateTime
  * 31,373건이 open 으로 쌓여 stale 비율 0.75 > 0.5 로 guard 가 상시 발동, `closed=0` 이 무한 반복됐다.
  * (정리를 해야 비율이 내려가는데 비율 때문에 정리가 막히는 교착.)
  *
- * 반면 공고기간 만료는 우리가 이미 갖고 있는 `notice_edt` 만으로 판정하므로 상류 응답 품질과 무관하다.
+ * 반면 공고기간 만료는 저장된 공고일·발견일을 [NoticePeriod]로 계산하므로 응답 누락 여부와 무관하다.
  * 그래서 guard 밖에서, sync 트랜잭션 밖에서, sync 성공 여부와도 무관하게 돈다 — 그래야 교착을 우회한다.
  *
  * `process_state` 는 절대 건드리지 않는다. "공고 종료" 는 "안락사" 가 아니고, 공고 후에도 보호소가
@@ -49,27 +49,54 @@ class AbandonedNoticeExpiryService(
         }
 
     /**
-     * `notice_edt < today` 이고 아직 진행중인 항목을 배치로 close 한다.
+     * 실효 종료일이 [today]보다 이르고 아직 진행중인 항목을 배치로 close 한다.
      *
      * @param today `YYYYMMDD`. 테스트에서 고정 날짜를 주입하려고 파라미터로 열어 둔다.
      * @return 실제로 close 된 건수
      */
     fun expireOverdueNotices(today: String = NoticePeriod.today()): Int {
+        val closedAt = LocalDateTime.now(NoticePeriod.ZONE)
         var total = 0
+        var cursor = ""
         repeat(MAX_BATCHES_PER_RUN) {
-            val closed = closeOneBatch(today)
-            total += closed
-            // 배치를 다 못 채웠으면 남은 대상이 없다는 뜻. 동시에 누가 close 해서 덜 찍힌 경우에도
-            // 여기서 멈추는 편이 안전하다 — 다음 주기가 이어서 처리한다.
-            if (closed < BATCH_SIZE) return total
+            val page = closeOnePage(today, cursor, closedAt)
+            total += page.closed
+            if (page.scanned < BATCH_SIZE) return total
+            cursor = page.lastId ?: return total
         }
-        log.warn("notice expiry batch cap reached — closed={} (나머지는 다음 주기에서 이어서 처리)", total)
+        log.warn("notice expiry page cap reached — scanned={} (나머지는 다음 주기에서 이어서 처리)", BATCH_SIZE * MAX_BATCHES_PER_RUN)
         return total
     }
 
-    private fun closeOneBatch(today: String): Int =
+    private fun closeOnePage(
+        today: String,
+        afterId: String,
+        closedAt: LocalDateTime,
+    ): PageResult =
         txTemplate.execute {
-            val ids = abandonedAnimalRepository.findExpiredOpenIds(today, BATCH_SIZE)
-            if (ids.isEmpty()) 0 else abandonedAnimalRepository.closeByIds(ids, LocalDateTime.now())
-        } ?: 0
+            val candidates =
+                abandonedAnimalRepository.findLockedRawExpiredOpenCandidates(
+                    today = today,
+                    afterId = afterId,
+                    limit = BATCH_SIZE,
+                )
+            var closed = 0
+            candidates.forEach { candidate ->
+                if (NoticePeriod.isOver(candidate.noticeEdt, today, candidate.noticeSdt, candidate.happenDt)) {
+                    candidate.close(closedAt)
+                    closed++
+                }
+            }
+            PageResult(
+                lastId = candidates.lastOrNull()?.id?.toString(),
+                scanned = candidates.size,
+                closed = closed,
+            )
+        } ?: PageResult(lastId = null, scanned = 0, closed = 0)
+
+    private data class PageResult(
+        val lastId: String?,
+        val scanned: Int,
+        val closed: Int,
+    )
 }

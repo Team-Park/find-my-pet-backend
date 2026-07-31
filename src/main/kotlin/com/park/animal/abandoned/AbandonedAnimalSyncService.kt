@@ -43,12 +43,26 @@ class AbandonedAnimalSyncService(
 
         try {
             // 네트워크만 코루틴에서. 이 구간에는 트랜잭션도 DB 커넥션도 잡지 않는다.
-            val fetched = runBlocking { fetchAll() }
+            val snapshot = runBlocking { fetchAll() }
+            if (!snapshot.complete) {
+                log.warn(
+                    "abandoned upstream snapshot incomplete — expected={} received={} unique={}. stale close skipped.",
+                    snapshot.expectedCount,
+                    snapshot.receivedCount,
+                    snapshot.animals.size,
+                )
+            }
             // 반영은 다른 빈의 논-suspend @Transactional — 프록시를 정상 경유한다.
-            val report = mirrorWriter.applyDiff(fetched, today)
+            val report =
+                mirrorWriter.applyDiff(
+                    fetched = snapshot.animals,
+                    today = today,
+                    allowStaleClose = snapshot.complete,
+                )
             log.info(
-                "abandoned sync done: fetched={} inserted={} updated={} closed={} fanout={}",
+                "abandoned sync done: fetched={} complete={} inserted={} updated={} closed={} fanout={}",
                 report.fetched,
+                snapshot.complete,
                 report.inserted,
                 report.updated,
                 report.closed,
@@ -58,7 +72,7 @@ class AbandonedAnimalSyncService(
             log.error("abandoned sync failed", e)
         }
 
-        // 공고 만료는 상류 응답이 아니라 우리가 가진 notice_edt 로만 판정하므로
+        // 공고 만료는 상류 응답이 아니라 저장된 공고일·발견일의 canonical 실효 종료일로 판정하므로
         // sync 성공 여부·stale guard 와 무관하게 항상 돌아야 한다.
         try {
             val expired = noticeExpiryService.expireOverdueNotices(today)
@@ -68,8 +82,15 @@ class AbandonedAnimalSyncService(
         }
     }
 
-    /** 상류 전 페이지를 모아 `desertionNo -> 엔티티` 로 돌려준다. DB 를 건드리지 않는다. */
-    suspend fun fetchAll(): Map<String, AbandonedAnimal> {
+    /**
+     * 상류 전 페이지를 모아 스냅샷으로 돌려준다. DB 를 건드리지 않는다.
+     *
+     * stale 종료는 "이번 전체 스냅샷에 없다"는 사실에만 의존해야 한다. `totalCount` 누락/변경,
+     * 중간 빈 페이지, 조기 `hasNextPage=false`, 안전 상한 절단, 중복 ID 중 하나라도 있으면
+     * [Snapshot.complete]를 false로 내려 기존 OPEN 행의 stale 종료를 금지한다. 수집된 개별 행의
+     * insert/update/명시 종료/실효 만료 반영은 계속 가능하다.
+     */
+    suspend fun fetchAll(): Snapshot {
         val fetched = mutableMapOf<String, AbandonedAnimal>()
         val firstPage =
             publicDataClient.fetchAbandonedAnimals(
@@ -80,14 +101,25 @@ class AbandonedAnimalSyncService(
                 endde = null,
             )
         firstPage.contents.forEach { fetched[it.desertionNo] = toEntity(it) }
+        var receivedCount = firstPage.contents.size
+        val expectedCount = firstPage.totalCount
 
-        val totalPages =
-            if (firstPage.totalCount > 0) {
-                ((firstPage.totalCount + PAGE_SIZE - 1) / PAGE_SIZE).toInt().coerceAtMost(MAX_PAGES)
+        val expectedPages =
+            if (expectedCount > 0) {
+                ((expectedCount + PAGE_SIZE - 1) / PAGE_SIZE).toInt()
             } else {
                 1
             }
-        log.debug("abandoned sync — totalCount={} → totalPages={}", firstPage.totalCount, totalPages)
+        val totalPages = expectedPages.coerceAtMost(MAX_PAGES)
+        var complete = expectedCount > 0 && expectedPages <= MAX_PAGES
+        if (firstPage.contents.isEmpty() && expectedCount > 0) complete = false
+        if (firstPage.hasNextPage != (expectedPages > 1)) complete = false
+        log.debug(
+            "abandoned sync — totalCount={} → expectedPages={} fetchPages={}",
+            expectedCount,
+            expectedPages,
+            totalPages,
+        )
 
         for (page in 2..totalPages) {
             val resp =
@@ -98,12 +130,34 @@ class AbandonedAnimalSyncService(
                     bgnde = null,
                     endde = null,
                 )
-            if (resp.contents.isEmpty()) break
+            if (resp.totalCount != expectedCount) complete = false
+            if (resp.contents.isEmpty()) {
+                complete = false
+                break
+            }
+            receivedCount += resp.contents.size
             resp.contents.forEach { item -> fetched[item.desertionNo] = toEntity(item) }
-            if (!resp.hasNextPage) break
+            val expectedMore = page < expectedPages
+            if (resp.hasNextPage != expectedMore) complete = false
+            if (!resp.hasNextPage && expectedMore) break
         }
-        return fetched
+
+        if (receivedCount.toLong() != expectedCount) complete = false
+        if (fetched.size.toLong() != expectedCount) complete = false
+        return Snapshot(
+            animals = fetched,
+            complete = complete,
+            expectedCount = expectedCount,
+            receivedCount = receivedCount,
+        )
     }
+
+    data class Snapshot(
+        val animals: Map<String, AbandonedAnimal>,
+        val complete: Boolean,
+        val expectedCount: Long,
+        val receivedCount: Int,
+    )
 
     private fun toEntity(r: AbandonedAnimalResponse): AbandonedAnimal {
         val region = regionLookupService.lookup(r.orgNm)

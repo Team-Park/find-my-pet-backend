@@ -24,7 +24,7 @@ class AbandonedAnimalController(
         description =
             "국가동물보호정보시스템(data.go.kr) 구조동물 조회 서비스를 백엔드 캐싱(Redis 5분) + " +
                 "HTTPS 래핑으로 제공. 서비스 키는 서버 내부에만 존재. " +
-                "기본은 진행중(noticeStatus=OPEN) 공고만 반환하며, 법정 공고기간(noticeEdt)이 지난 항목은 제외된다.",
+                "기본은 서버가 OPEN으로 판정한 공고만 반환하며, CLOSED·ALL 필터도 지원한다.",
     )
     suspend fun getAbandonedAnimals(
         @Parameter(description = "DOG | CAT | OTHER — 생략 시 전체")
@@ -42,7 +42,8 @@ class AbandonedAnimalController(
         @Parameter(
             description =
                 "공고 상태 OPEN | CLOSED | ALL. 기본 OPEN(진행중). " +
-                    "공고기간이 끝난 항목은 OPEN 에서 제외되지만 상세 조회는 계속 200. 인식 불가 값은 OPEN 으로 처리.",
+                    "CLOSED는 명시 종료·실효 기간 만료·수용된 상류 제거를 포함하며 상세 조회는 계속 200. " +
+                    "인식 불가 값은 OPEN 으로 처리.",
         )
         @RequestParam("noticeStatus", required = false, defaultValue = "OPEN") noticeStatus: String,
     ): PaginatedApiResponseBody<AbandonedAnimalResponse> {

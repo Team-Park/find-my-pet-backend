@@ -55,8 +55,8 @@ class AbandonedAnimal(
     @Column(name = "closed_at")
     var closedAt: LocalDateTime? = null,
 ) : BaseEntity() {
-    fun close() {
-        if (this.closedAt == null) this.closedAt = LocalDateTime.now()
+    fun close(at: LocalDateTime) {
+        if (this.closedAt == null) this.closedAt = at
     }
 
     /** 응답에 다시 나타난 경우 mutable 필드 갱신. */

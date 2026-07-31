@@ -4,16 +4,15 @@ import java.time.Clock
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.time.temporal.ChronoUnit
 
 /**
  * 공공데이터 공고기간(`notice_sdt` ~ `notice_edt`) 판정.
  *
- * 왜 `notice_edt` 로 판정하는가: 상류(data.go.kr)의 `process_state` 는 실제로 갱신되지 않아
- * 발견 후 100일이 지난 공고도 "보호중" 으로 내려온다. 반면 `notice_edt` 는 우리가 이미 갖고 있고
- * 상류 응답 품질과 무관하며, 법정 공고기간이 끝난 공고는 정의상 진행중이 아니다.
+ * 상류(data.go.kr)의 `process_state` 는 실제로 갱신되지 않아 발견 후 100일이 지난 공고도
+ * "보호중" 으로 내려온다. 그래서 저장된 공고 종료일에 공고 시작일·발견일의 7일 하한을 반영한
+ * 실효 종료일을 서버의 단일 판정 기준으로 사용한다.
  *
- * `notice_edt` 는 `YYYYMMDD` 고정폭이라 문자열 비교가 곧 날짜 비교다.
+ * 모든 원본 날짜는 엄격한 Gregorian `YYYYMMDD` 파싱을 통과한 뒤 비교한다.
  */
 object NoticePeriod {
     private val YYYYMMDD = Regex("^\\d{8}$")
@@ -41,7 +40,8 @@ object NoticePeriod {
         LocalDate.now(clock.withZone(ZONE)).format(DateTimeFormatter.BASIC_ISO_DATE)
 
     /**
-     * 법정 최소 공고기간(일). 동물보호법상 공고 후 7일이 지나야 소유권이 넘어간다.
+     * 법정 최소 공고기간(일). 동물보호법상 보호조치 사실을 7일 이상 공고해야 한다.
+     * 공고일부터 10일이 지나도 소유자를 알 수 없을 때의 지자체 소유권 취득 조건과는 별개다.
      *
      * 상류가 이보다 짧은 기간을 주면 **데이터가 틀린 것이지 공고가 진짜 끝난 게 아니다.**
      */
@@ -63,28 +63,48 @@ object NoticePeriod {
      * 상류 입력 오류다. 그대로 믿으면 **어제 구조된 아이가 오늘 목록에서 사라진다** —
      * 실제로 최근 10일 내 발견분 53건이 이렇게 숨겨졌다.
      *
-     * 그래서 [noticeSdt] 를 함께 받아 공고기간이 법정 최소치([MIN_NOTICE_DAYS])보다 짧으면
-     * 만료로 보지 않는다. 형식 검사와 같은 이유이고 같은 방향이다 — **의심스러우면 남긴다.**
-     * [noticeSdt] 가 없거나 형식 불량이면 교차 검증을 못 하므로 [noticeEdt] 만으로 판정한다.
+     * 그래서 [noticeEdt] 를 그대로 믿지 않고 **[noticeSdt]와 [happenDt] 중 늦은 날 + 법정 최소기간**과
+     * 비교해 늦은 쪽을 실효 종료일로 삼는다([effectiveEdt]).
+     *
+     * "짧으면 만료시키지 않는다" 로 처리하면 안 된다. 공고기간이 짧다는 건 **레코드 자체의 속성**이라
+     * 날짜가 지나도 변하지 않으므로, 그 4.6% 가 **영원히 만료되지 않고 쌓인다** — 고치려던
+     * "영원히 보호중으로 남는" 문제를 더 작은 부분집합에서 그대로 재현하는 셈이다.
+     * 실효 종료일 방식은 그 아이도 결국(공고시작일·발견일 중 늦은 날 + 7일 뒤) 만료시키면서
+     * 최소 노출 기간은 지킨다.
+     *
+     * [noticeSdt] 와 [happenDt] 모두 없거나 형식 불량이면 교차 검증을 못 하므로 [noticeEdt] 만으로 판정한다.
      */
     fun isOver(
         noticeEdt: String?,
         today: String = today(),
         noticeSdt: String? = null,
+        happenDt: String? = null,
     ): Boolean {
-        if (noticeEdt == null || !YYYYMMDD.matches(noticeEdt)) return false
-        if (noticeEdt >= today) return false
-        return !isImplausiblyShort(noticeSdt, noticeEdt)
+        val edt = effectiveEdt(noticeSdt, noticeEdt, happenDt) ?: return false
+        return edt < today
     }
 
-    /** 공고기간이 법정 최소치보다 짧은가 = 상류 데이터를 믿을 수 없는가. */
-    private fun isImplausiblyShort(
+    /**
+     * 실효 공고종료일 = `max(noticeEdt, max(noticeSdt, happenDt) + MIN_NOTICE_DAYS)`.
+     *
+     * 정상 레코드(기간 10일)는 `noticeEdt` 가 그대로 이기므로 동작이 바뀌지 않는다.
+     * 기간 0일짜리와 발견일이 늦은 공고는 기준일 + 7일로 밀려 최소 노출 기간을 확보한다.
+     * 판정 불가(값 없음/형식 불량)면 `null` — 호출자는 만료로 보지 않는다.
+     */
+    fun effectiveEdt(
         noticeSdt: String?,
-        noticeEdt: String,
-    ): Boolean {
-        if (noticeSdt == null || !YYYYMMDD.matches(noticeSdt)) return false
-        val start = runCatching { LocalDate.parse(noticeSdt, DateTimeFormatter.BASIC_ISO_DATE) }.getOrNull() ?: return false
-        val end = runCatching { LocalDate.parse(noticeEdt, DateTimeFormatter.BASIC_ISO_DATE) }.getOrNull() ?: return false
-        return ChronoUnit.DAYS.between(start, end) < MIN_NOTICE_DAYS
+        noticeEdt: String?,
+        happenDt: String? = null,
+    ): String? {
+        val end = parse(noticeEdt) ?: return null
+        val anchor = listOfNotNull(parse(noticeSdt), parse(happenDt)).maxOrNull() ?: return noticeEdt
+        val floor = runCatching { anchor.plusDays(MIN_NOTICE_DAYS) }.getOrNull() ?: return null
+        if (floor.year !in 0..9999) return null
+        return maxOf(end, floor).format(DateTimeFormatter.BASIC_ISO_DATE)
+    }
+
+    private fun parse(raw: String?): LocalDate? {
+        if (raw == null || !YYYYMMDD.matches(raw)) return null
+        return runCatching { LocalDate.parse(raw, DateTimeFormatter.BASIC_ISO_DATE) }.getOrNull()
     }
 }

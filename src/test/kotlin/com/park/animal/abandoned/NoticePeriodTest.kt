@@ -57,20 +57,31 @@ class NoticePeriodTest {
     }
 
     @Test
-    fun `공고기간이 법정 최소치보다 짧으면 만료로 보지 않는다 - 상류 입력 오류`() {
+    fun `공고기간이 0일이어도 법정 최소기간까지는 살아있다`() {
         val today = NoticePeriod.today(crossover) // 20260728
 
-        // 실제 사례: 413582202600529 — 7/26 에 발견된 고양이인데 공고종료일도 7/26.
-        // notice_edt(20260726) < today 이지만 공고기간이 0일이라 상류 데이터를 믿을 수 없다.
+        // 실제 사례 413582202600529 — 7/26 발견인데 공고종료일도 7/26.
+        // notice_edt 만 보면 이미 지났지만, 실효 종료일은 20260726+7 = 20260802 다.
         assertFalse(
             NoticePeriod.isOver("20260726", today, noticeSdt = "20260726"),
-            "공고기간 0일짜리를 만료로 보면 어제 구조된 아이가 오늘 사라진다",
+            "공고기간 0일짜리를 그대로 믿으면 어제 구조된 아이가 오늘 사라진다",
         )
-        assertFalse(NoticePeriod.isOver("20260720", today, noticeSdt = "20260715"), "5일짜리도 법정 미만이다")
+        assertEquals("20260802", NoticePeriod.effectiveEdt("20260726", "20260726"))
+    }
 
-        // 7일 이상이면 정상 데이터로 보고 판정한다.
-        assertTrue(NoticePeriod.isOver("20260722", today, noticeSdt = "20260715"), "7일짜리는 정상 공고다")
-        assertTrue(NoticePeriod.isOver("20260727", today, noticeSdt = "20260717"), "10일짜리는 정상 공고다")
+    @Test
+    fun `그 아이도 결국은 만료된다 - 영원히 남으면 그것도 버그다`() {
+        // "기간이 짧으면 제외" 로 처리하면 공고기간은 레코드 속성이라 날짜가 지나도 안 변해서
+        // 4.6% 가 영원히 쌓인다. 실효 종료일 방식은 최소 노출만 보장하고 결국 만료시킨다.
+        assertFalse(NoticePeriod.isOver("20260726", "20260802", noticeSdt = "20260726"), "실효 종료일 당일은 아직 아니다")
+        assertTrue(NoticePeriod.isOver("20260726", "20260803", noticeSdt = "20260726"), "7일이 지나면 만료돼야 한다")
+        assertTrue(NoticePeriod.isOver("20260726", "20261231", noticeSdt = "20260726"), "반년이 지나도 안 내려가면 안 된다")
+    }
+
+    @Test
+    fun `정상 공고는 실효 종료일이 notice_edt 그대로다`() {
+        assertEquals("20260727", NoticePeriod.effectiveEdt("20260717", "20260727"), "10일짜리는 하한에 안 걸린다")
+        assertEquals("20260722", NoticePeriod.effectiveEdt("20260715", "20260722"), "7일짜리도 하한과 같다")
     }
 
     @Test
@@ -80,5 +91,27 @@ class NoticePeriodTest {
         // 이때는 종전대로 notice_edt 단독 판정으로 돌아간다.
         assertTrue(NoticePeriod.isOver("20260726", today, noticeSdt = null))
         assertTrue(NoticePeriod.isOver("20260726", today, noticeSdt = "2026-07-16"))
+    }
+
+    @Test
+    fun `발견일이 공고시작일보다 늦으면 발견일 기준 7일을 보장한다`() {
+        assertEquals(
+            "20260730",
+            NoticePeriod.effectiveEdt("20260722", "20260722", happenDt = "20260723"),
+        )
+        assertFalse(NoticePeriod.isOver("20260722", "20260730", "20260722", "20260723"))
+        assertTrue(NoticePeriod.isOver("20260722", "20260731", "20260722", "20260723"))
+    }
+
+    @Test
+    fun `달력에 없는 종료일은 판정 불가라 닫지 않는다`() {
+        assertEquals(null, NoticePeriod.effectiveEdt("20260220", "20260230", "20260220"))
+        assertFalse(NoticePeriod.isOver("20260230", "20260301", "20260220", "20260220"))
+    }
+
+    @Test
+    fun `날짜 상한에서도 예외로 동기화를 깨뜨리지 않는다`() {
+        assertEquals(null, NoticePeriod.effectiveEdt("99991231", "99991231", "99991231"))
+        assertFalse(NoticePeriod.isOver("99991231", "99991231", "99991231", "99991231"))
     }
 }

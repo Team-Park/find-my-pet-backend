@@ -4,10 +4,8 @@ import com.park.animal.abandoned.entity.AbandonedAnimal
 import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
-import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
-import java.time.LocalDateTime
 import java.util.UUID
 
 interface AbandonedAnimalRepository : JpaRepository<AbandonedAnimal, UUID> {
@@ -86,58 +84,27 @@ interface AbandonedAnimalRepository : JpaRepository<AbandonedAnimal, UUID> {
         pageable: Pageable,
     ): Page<AbandonedAnimal>
 
-    /**
-     * 공고기간이 끝난 진행중 항목 id 배치.
-     *
-     * `notice_edt` 가 NULL 이거나 `YYYYMMDD` 8자리 숫자가 아니면 대상에서 제외한다 —
-     * 판정 불가를 종료로 취급하면 아직 보호소에 있는 아이가 목록에서 사라진다.
-     * (`CHAR_LENGTH = 8` + `^[0-9]{8}` 조합이면 전체가 숫자임이 보장된다.)
-     *
-     * `ORDER BY` 를 두지 않는 이유: 첫 정리에서 2만건 이상을 배치로 도는데 매 배치마다 filesort 만
-     * 유발한다. `closed_at` 을 찍는 순간 다음 배치의 대상에서 빠지므로 진행은 보장된다.
-     */
+    /** raw 종료일이 지난 OPEN 후보를 id keyset 한 페이지로 잠근다. 최종 판정은 서비스가 수행한다. */
     @Query(
         value = """
-        SELECT id FROM abandoned_animal
-        WHERE closed_at IS NULL
+        SELECT * FROM abandoned_animal
+        WHERE id > :afterId
+          AND closed_at IS NULL
           AND notice_edt IS NOT NULL
           AND CHAR_LENGTH(notice_edt) = 8
           AND notice_edt REGEXP '^[0-9]{8}'
           AND notice_edt < :today
-          -- 공고기간이 법정 최소치(7일)보다 짧으면 상류 입력 오류로 보고 제외한다.
-          -- happenDt = noticeSdt = noticeEdt 인 0일짜리 레코드가 실제로 4.6% 있고, 그대로 믿으면
-          -- 어제 구조된 아이가 오늘 사라진다. notice_sdt 가 없거나 형식 불량이면 교차 검증을
-          -- 할 수 없으므로 notice_edt 만으로 판정한다(= 이 조건을 통과시킨다).
-          AND (
-            notice_sdt IS NULL
-            OR CHAR_LENGTH(notice_sdt) <> 8
-            OR notice_sdt NOT REGEXP '^[0-9]{8}'
-            OR DATEDIFF(STR_TO_DATE(notice_edt, '%Y%m%d'), STR_TO_DATE(notice_sdt, '%Y%m%d')) >= 7
-          )
+        ORDER BY id
         LIMIT :limit
+        FOR UPDATE SKIP LOCKED
         """,
         nativeQuery = true,
     )
-    fun findExpiredOpenIds(
+    fun findLockedRawExpiredOpenCandidates(
         @Param("today") today: String,
+        @Param("afterId") afterId: String,
         @Param("limit") limit: Int,
-    ): List<String>
-
-    /**
-     * 배치 close. `process_state` 는 건드리지 않는다 — 우리가 아는 건 "공고 기간이 끝났다" 이지
-     * "안락사됐다" 가 아니다. 공고 후에도 보호소가 계속 데리고 있는 경우가 있다.
-     *
-     * 벌크 UPDATE 라 영속성 컨텍스트를 우회하므로 실행 전후로 flush/clear 한다.
-     */
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(
-        value = "UPDATE abandoned_animal SET closed_at = :closedAt WHERE id IN (:ids) AND closed_at IS NULL",
-        nativeQuery = true,
-    )
-    fun closeByIds(
-        @Param("ids") ids: Collection<String>,
-        @Param("closedAt") closedAt: LocalDateTime,
-    ): Int
+    ): List<AbandonedAnimal>
 
     @Query(
         """

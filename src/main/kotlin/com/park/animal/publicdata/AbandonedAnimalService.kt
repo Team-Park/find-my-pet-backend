@@ -2,6 +2,7 @@ package com.park.animal.publicdata
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.park.animal.abandoned.NoticePeriod
 import com.park.animal.abandoned.NoticeStatus
 import com.park.animal.abandoned.entity.AbandonedAnimal
 import com.park.animal.abandoned.repository.AbandonedAnimalRepository
@@ -87,7 +88,7 @@ class AbandonedAnimalService(
         val cacheKey = buildCacheKey(upkind, pageNo, numOfRows, bgnde, endde, uprCd, orgCd)
 
         redisDriver.getValue(cacheKey, String::class.java)?.let { cached ->
-            return objectMapper.readValue(cached)
+            return normalizeDirectPage(objectMapper.readValue(cached))
         }
 
         val page = publicDataClient.fetchAbandonedAnimals(upkind, pageNo, numOfRows, bgnde, endde, uprCd, orgCd)
@@ -96,7 +97,27 @@ class AbandonedAnimalService(
             redisDriver.setValue(cacheKey, objectMapper.writeValueAsString(page), CACHE_TTL_SECONDS)
         }.onFailure { log.warn("Failed to cache public data page", it) }
 
-        return page
+        return normalizeDirectPage(page)
+    }
+
+    private fun normalizeDirectPage(page: AbandonedAnimalPage): AbandonedAnimalPage {
+        val today = NoticePeriod.today()
+        val open =
+            page.contents.mapNotNull { item ->
+                val effectiveNoticeEdt = NoticePeriod.effectiveEdt(item.noticeSdt, item.noticeEdt, item.happenDt)
+                val noticeClosed =
+                    item.processState?.startsWith("종료") == true ||
+                        NoticePeriod.isOver(item.noticeEdt, today, item.noticeSdt, item.happenDt)
+                item.copy(
+                    effectiveNoticeEdt = effectiveNoticeEdt,
+                    noticeClosed = noticeClosed,
+                    noticeClosedAt = null,
+                ).takeUnless { noticeClosed }
+            }
+        // 부팅 직후 fallback은 상류의 후보 페이지를 한 장씩 전달하는 edge mode다. 이 요청에서
+        // CLOSED contents만 제거하되, 다음 후보 페이지를 계속 스캔할 수 있도록 상류 pagination
+        // metadata(totalCount/hasNextPage)는 보존한다. 여기서 모든 상류 페이지를 재조회하지 않는다.
+        return page.copy(contents = open)
     }
 
     /**
@@ -127,6 +148,7 @@ class AbandonedAnimalService(
             noticeNo = a.noticeNo,
             noticeSdt = a.noticeSdt,
             noticeEdt = a.noticeEdt,
+            effectiveNoticeEdt = NoticePeriod.effectiveEdt(a.noticeSdt, a.noticeEdt, a.happenDt),
             animalType = a.animalType,
             orgNm = null,
             noticeClosed = a.closedAt != null,
